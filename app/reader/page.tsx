@@ -87,7 +87,7 @@ export default function ReaderPage() {
           <PDFReader
             bookUrl="/api/book"
             purchased={purchased}
-            previewLimit={5}
+            previewLimit={10}
             onTextChange={handleTextChange}
           />
         </div>
@@ -102,7 +102,7 @@ export default function ReaderPage() {
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
             <p className="text-cream-300 text-sm">
               <span className="text-gold font-medium">Enjoying the preview?</span>
-              {' '}Get full access to all pages.
+              {' '}Get full access to all 174 pages.
             </p>
             <Link href="/purchase"
               className="shrink-0 px-5 py-2 bg-gold text-navy-900 font-bold text-sm uppercase tracking-wider hover:bg-gold-light transition-colors rounded-sm">

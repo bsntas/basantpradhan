@@ -2,29 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 
-declare global {
-  interface Window {
-    pdfjsLib: {
-      GlobalWorkerOptions: { workerSrc: string };
-      getDocument: (src: string | ArrayBuffer | { data: ArrayBuffer }) => { promise: Promise<PDFDocumentProxy> };
-    };
-  }
-}
-
-interface PDFDocumentProxy {
-  numPages: number;
-  getPage: (num: number) => Promise<PDFPageProxy>;
-}
-
-interface PDFPageProxy {
-  getViewport: (opts: { scale: number }) => { width: number; height: number };
-  render: (ctx: { canvasContext: CanvasRenderingContext2D; viewport: ReturnType<PDFPageProxy['getViewport']> }) => { promise: Promise<void> };
-  getTextContent: () => Promise<{ items: Array<{ str: string }> }>;
-}
-
 const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-const PREVIEW_LIMIT = 5;
+const PREVIEW_LIMIT = 10;
 
 interface PDFReaderProps {
   bookUrl: string;
@@ -37,7 +17,8 @@ type FlipState = 'idle' | 'out' | 'in';
 
 export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT, onTextChange }: PDFReaderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -102,7 +83,8 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
       // Extract text for voice reader
       const tc = await page.getTextContent();
-      const text = tc.items.map((i) => i.str).join(' ').replace(/\s+/g, ' ').trim();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const text = tc.items.map((i: any) => i.str).join(' ').replace(/\s+/g, ' ').trim();
       onTextChange?.(text);
     } catch {
       // ignore render errors on page change

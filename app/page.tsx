@@ -2,6 +2,9 @@ import { getServerUser } from '@/lib/auth';
 import { findUserById } from '@/lib/db';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
+
+const BookCover = dynamic(() => import('@/components/BookCover'), { ssr: false });
 
 export default async function HomePage() {
   const session = await getServerUser();
@@ -68,77 +71,9 @@ export default async function HomePage() {
             </div>
           </div>
 
-          {/* Right: 3-D book mockup */}
-          <div className="flex justify-center lg:justify-end">
-            <div className="animate-float" style={{ transformStyle: 'preserve-3d' }}>
-              {/* Book group */}
-              <div className="relative" style={{ width: 280, height: 390 }}>
-                {/* Spine */}
-                <div className="absolute top-0 bottom-0 rounded-l-sm"
-                  style={{
-                    width: 40,
-                    left: -38,
-                    background: 'linear-gradient(90deg, #04070f 0%, #111827 100%)',
-                    transform: 'rotateY(-90deg)',
-                    transformOrigin: 'right',
-                    boxShadow: '-4px 0 20px rgba(0,0,0,0.5)',
-                  }}>
-                  <div className="h-full flex items-center justify-center">
-                    <p className="text-gold/60 text-xs tracking-widest font-serif"
-                      style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}>
-                      KOLTEY GOLAI
-                    </p>
-                  </div>
-                </div>
-
-                {/* Cover */}
-                <div className="absolute inset-0 rounded-r-sm overflow-hidden"
-                  style={{
-                    background: 'linear-gradient(155deg, #111827 0%, #0f3460 50%, #0a0e1a 100%)',
-                    boxShadow: '8px 8px 40px rgba(0,0,0,0.7), inset 0 0 80px rgba(201,168,76,0.05)',
-                    border: '1px solid rgba(201,168,76,0.15)',
-                  }}>
-                  {/* Decorative elements */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-between p-8">
-                    {/* Top ornament */}
-                    <div className="w-full flex items-center gap-2 opacity-60">
-                      <div className="flex-1 h-px bg-gold/40" />
-                      <svg className="w-5 h-5 text-gold" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
-                      </svg>
-                      <div className="flex-1 h-px bg-gold/40" />
-                    </div>
-
-                    {/* Center content */}
-                    <div className="text-center">
-                      {/* Silhouette hills */}
-                      <div className="relative h-24 mb-6 opacity-40">
-                        <svg viewBox="0 0 280 96" className="w-full" fill="none">
-                          <path d="M0 96 Q40 20 80 50 Q120 80 160 30 Q200 0 240 40 Q260 55 280 30 L280 96 Z" fill="#c9a84c" opacity="0.3"/>
-                          <path d="M0 96 Q60 40 100 60 Q140 80 180 45 Q220 20 280 50 L280 96 Z" fill="#c9a84c" opacity="0.5"/>
-                          <circle cx="200" cy="25" r="15" fill="#c9a84c" opacity="0.2"/>
-                        </svg>
-                      </div>
-                      <h2 className="font-serif text-3xl text-cream-100 leading-tight mb-1">Koltey</h2>
-                      <h2 className="font-serif text-3xl text-gold leading-tight">Golai</h2>
-                    </div>
-
-                    {/* Author */}
-                    <div className="text-center">
-                      <div className="flex items-center gap-2 mb-2 opacity-60">
-                        <div className="flex-1 h-px bg-gold/40" />
-                        <div className="flex-1 h-px bg-gold/40" />
-                      </div>
-                      <p className="text-cream-300 text-xs tracking-[0.25em] uppercase font-sans">Basant Pradhan</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Shadow */}
-                <div className="absolute -bottom-4 left-4 right-0 h-8 rounded-full opacity-40"
-                  style={{ background: 'rgba(0,0,0,0.5)', filter: 'blur(12px)' }} />
-              </div>
-            </div>
+          {/* Right: Real PDF cover with 3-D book effect */}
+          <div className="flex justify-center lg:justify-end" style={{ perspective: '1200px' }}>
+            <BookCover />
           </div>
         </div>
       </section>

@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     headers: {
       'Content-Type': 'application/pdf',
       'Cache-Control': 'no-store, no-cache, must-revalidate',
-      'X-Preview-Only': purchased ? 'false' : '5',
+      'X-Preview-Only': purchased ? 'false' : '10',
       'Content-Disposition': 'inline',
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'SAMEORIGIN',
