@@ -2,6 +2,10 @@
 const nextConfig = {
   experimental: {
     serverActions: { allowedOrigins: ['*'] },
+    // Ensure the private PDF is bundled with the /api/book serverless function
+    outputFileTracingIncludes: {
+      '/api/book': ['./private/**/*'],
+    },
   },
   headers: async () => [
     {

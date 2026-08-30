@@ -7,7 +7,7 @@ export default async function HomePage() {
   const session = await getServerUser();
   let user = null;
   if (session) {
-    const dbUser = findUserById(session.userId);
+    const dbUser = await findUserById(session.userId);
     if (dbUser) user = { name: dbUser.name, email: dbUser.email, purchases: dbUser.purchases };
   }
   const hasPurchased = user?.purchases.includes('koltey-golai') ?? false;

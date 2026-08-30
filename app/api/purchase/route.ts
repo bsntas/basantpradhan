@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const { bookId } = await req.json();
   if (!bookId) return NextResponse.json({ error: 'bookId required' }, { status: 400 });
 
-  addPurchase(session.userId, bookId);
+  await addPurchase(session.userId, bookId);
   return NextResponse.json({ ok: true, bookId });
 }
 
@@ -18,5 +18,5 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ purchased: false });
   const { searchParams } = new URL(req.url);
   const bookId = searchParams.get('bookId') ?? 'koltey-golai';
-  return NextResponse.json({ purchased: hasPurchased(session.userId, bookId) });
+  return NextResponse.json({ purchased: await hasPurchased(session.userId, bookId) });
 }

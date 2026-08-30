@@ -4,8 +4,10 @@ import { hasPurchased } from '@/lib/db';
 import fs from 'fs';
 import path from 'path';
 
+// Give the function enough time to read and stream the PDF
+export const maxDuration = 30;
+
 const BOOK_PATH = path.join(process.cwd(), 'private', 'book.pdf');
-const PREVIEW_PAGES = 5;
 
 export async function GET(req: NextRequest) {
   const session = await getUserFromRequest(req);
@@ -13,8 +15,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const purchased = hasPurchased(session.userId, 'koltey-golai');
-  const isPreview = !purchased;
+  const purchased = await hasPurchased(session.userId, 'koltey-golai');
 
   if (!fs.existsSync(BOOK_PATH)) {
     return NextResponse.json({ error: 'Book not found' }, { status: 404 });
@@ -22,14 +23,14 @@ export async function GET(req: NextRequest) {
 
   const fileBuffer = fs.readFileSync(BOOK_PATH);
 
-  const headers = new Headers({
-    'Content-Type': 'application/pdf',
-    'Cache-Control': 'no-store, no-cache, must-revalidate',
-    'X-Preview-Only': isPreview ? String(PREVIEW_PAGES) : 'false',
-    'Content-Disposition': 'inline',
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'SAMEORIGIN',
+  return new NextResponse(fileBuffer, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'X-Preview-Only': purchased ? 'false' : '5',
+      'Content-Disposition': 'inline',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN',
+    },
   });
-
-  return new NextResponse(fileBuffer, { headers });
 }
