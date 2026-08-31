@@ -84,6 +84,8 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   }, [loadDocument]);
 
   // Renders pageNum to any canvas at DPR-aware resolution. Returns CSS {w,h} or null on error.
+  // Two-up landscape spreads (width > height * 1.4) are cropped to the right half so
+  // cover pages inserted as spreads display as a single portrait page.
   const renderToCanvas = useCallback(async (
     pageNum: number,
     canvas: HTMLCanvasElement,
@@ -96,20 +98,29 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       if (cW === 0 || cH === 0) return null;
 
       const natural = page.getViewport({ scale: 1 });
-      const scaleW = (cW - 48) / natural.width;
+      const isSpread = natural.width > natural.height * 1.4;
+      const effectiveW = isSpread ? natural.width / 2 : natural.width;
+
+      const scaleW = (cW - 48) / effectiveW;
       const scaleH = (cH - 48) / natural.height;
       const fitScale = Math.min(scaleW, scaleH, 2.5);
 
       const dpr = window.devicePixelRatio || 1;
       const viewport = page.getViewport({ scale: fitScale * dpr });
-      canvas.width = viewport.width;
+      const halfW = Math.round(viewport.width / 2);
+
+      canvas.width  = isSpread ? halfW : viewport.width;
       canvas.height = viewport.height;
-      const cssW = Math.round(viewport.width / dpr);
+      const cssW = Math.round(canvas.width / dpr);
       const cssH = Math.round(viewport.height / dpr);
-      canvas.style.width = `${cssW}px`;
+      canvas.style.width  = `${cssW}px`;
       canvas.style.height = `${cssH}px`;
 
       const ctx = canvas.getContext('2d')!;
+      if (isSpread) {
+        // Translate left by half the full page width so only the right half renders into the canvas
+        ctx.translate(-halfW, 0);
+      }
       await page.render({ canvasContext: ctx, viewport }).promise;
 
       if (emitText) {
