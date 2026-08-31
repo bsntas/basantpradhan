@@ -28,6 +28,8 @@ function currentChapter(page: number): TocEntry | undefined {
 export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT, onTextChange }: PDFReaderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -297,6 +299,19 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         className="flex-1 min-h-0 flex items-center justify-center overflow-hidden"
         style={{ perspective: '1200px' }}
         onContextMenu={e => e.preventDefault()}
+        onTouchStart={e => {
+          touchStartX.current = e.touches[0].clientX;
+          touchStartY.current = e.touches[0].clientY;
+        }}
+        onTouchEnd={e => {
+          const dx = e.changedTouches[0].clientX - touchStartX.current;
+          const dy = e.changedTouches[0].clientY - touchStartY.current;
+          // Only fire on predominantly horizontal swipes of at least 40px
+          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) goToPage(currentPage + 1, 'forward');
+            else        goToPage(currentPage - 1, 'backward');
+          }
+        }}
       >
         <canvas
           ref={canvasRef}
@@ -374,8 +389,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
             </svg>
           </button>
         </div>
-        <p className="text-cream-300/25 text-[10px] text-center mt-1">
-          ← → तीर कुञ्जीहरू प्रयोग गर्नुहोस् · Use arrow keys to navigate
+        <p className="text-cream-300/25 text-[10px] text-center mt-1 select-none">
+          <span className="sm:hidden">swipe left / right to navigate</span>
+          <span className="hidden sm:inline">← → arrow keys · swipe on touch screens</span>
         </p>
       </div>
     </div>
