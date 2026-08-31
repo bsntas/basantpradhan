@@ -19,14 +19,36 @@ export interface UserPublic {
 
 // ── Storage adapters ─────────────────────────────────────────────────────────
 
-const useKV = () => Boolean(process.env.KV_REST_API_URL);
+const useRedisUrl = () => Boolean(process.env.REDIS_URL);
+const useKV = () => !useRedisUrl() && Boolean(process.env.KV_REST_API_URL);
 
-// Vercel KV (production)
+// ioredis client (singleton per serverless instance)
+let _redisClient: import('ioredis').Redis | null = null;
+function getRedis(): import('ioredis').Redis {
+  if (!_redisClient) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Redis = require('ioredis') as typeof import('ioredis');
+    _redisClient = new (Redis as unknown as { new(url: string): import('ioredis').Redis })(process.env.REDIS_URL!);
+    _redisClient.on('error', (err: Error) => console.error('[ioredis]', err));
+  }
+  return _redisClient;
+}
+
+async function redisGet<T>(key: string): Promise<T | null> {
+  const val = await getRedis().get(key);
+  if (!val) return null;
+  return JSON.parse(val) as T;
+}
+
+async function redisSet(key: string, value: unknown): Promise<void> {
+  await getRedis().set(key, JSON.stringify(value));
+}
+
+// Vercel KV (REST-based, legacy)
 async function kvGet<T>(key: string): Promise<T | null> {
   const { kv } = await import('@vercel/kv');
   const val = await kv.get<string>(key);
   if (val === null || val === undefined) return null;
-  // kv.set stores parsed JSON automatically; stringify guard for safety
   return (typeof val === 'string' ? JSON.parse(val) : val) as T;
 }
 
@@ -35,7 +57,7 @@ async function kvSet(key: string, value: unknown): Promise<void> {
   await kv.set(key, JSON.stringify(value));
 }
 
-// JSON file fallback (local dev — no KV vars needed)
+// JSON file fallback (local dev only)
 function readFile(): { users: User[] } {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const fs = require('fs') as typeof import('fs');
@@ -57,10 +79,23 @@ function writeFile(db: { users: User[] }): void {
   try {
     fs.writeFileSync(file, JSON.stringify(db, null, 2));
   } catch (err) {
-    // Vercel production filesystem is read-only — KV_REST_API_URL must be set
-    console.error('[db] writeFile failed (read-only filesystem?). Set KV_REST_API_URL in Vercel env vars.', err);
-    throw new Error('Database unavailable: set KV_REST_API_URL in Vercel environment variables');
+    // Vercel production filesystem is read-only — set REDIS_URL or KV_REST_API_URL
+    console.error('[db] writeFile failed (read-only filesystem?). Set REDIS_URL in Vercel env vars.', err);
+    throw new Error('Database unavailable: set REDIS_URL in Vercel environment variables');
   }
+}
+
+// ── Unified get/set ──────────────────────────────────────────────────────────
+
+async function dbGet<T>(key: string): Promise<T | null> {
+  if (useRedisUrl()) return redisGet<T>(key);
+  if (useKV()) return kvGet<T>(key);
+  return null;
+}
+
+async function dbSet(key: string, value: unknown): Promise<void> {
+  if (useRedisUrl()) return redisSet(key, value);
+  if (useKV()) return kvSet(key, value);
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -79,9 +114,9 @@ export async function createUser(
     createdAt: new Date().toISOString(),
   };
 
-  if (useKV()) {
-    await kvSet(`user:${user.id}`, user);
-    await kvSet(`email:${normalEmail}`, user.id);
+  if (useRedisUrl() || useKV()) {
+    await dbSet(`user:${user.id}`, user);
+    await dbSet(`email:${normalEmail}`, user.id);
   } else {
     const db = readFile();
     db.users.push(user);
@@ -93,8 +128,8 @@ export async function createUser(
 
 export async function findUserByEmail(email: string): Promise<User | null> {
   const normalEmail = email.toLowerCase();
-  if (useKV()) {
-    const userId = await kvGet<string>(`email:${normalEmail}`);
+  if (useRedisUrl() || useKV()) {
+    const userId = await dbGet<string>(`email:${normalEmail}`);
     if (!userId) return null;
     const raw = typeof userId === 'object' ? (userId as unknown as string) : userId;
     return findUserById(raw);
@@ -104,8 +139,8 @@ export async function findUserByEmail(email: string): Promise<User | null> {
 }
 
 export async function findUserById(id: string): Promise<User | null> {
-  if (useKV()) {
-    return kvGet<User>(`user:${id}`);
+  if (useRedisUrl() || useKV()) {
+    return dbGet<User>(`user:${id}`);
   }
   const db = readFile();
   return db.users.find(u => u.id === id) ?? null;
@@ -120,8 +155,8 @@ export async function addPurchase(userId: string, bookId: string): Promise<boole
   if (!user) return false;
   if (!user.purchases.includes(bookId)) {
     user.purchases.push(bookId);
-    if (useKV()) {
-      await kvSet(`user:${userId}`, user);
+    if (useRedisUrl() || useKV()) {
+      await dbSet(`user:${userId}`, user);
     } else {
       const db = readFile();
       const u = db.users.find(x => x.id === userId);
