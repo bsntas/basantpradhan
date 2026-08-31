@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_CDN = '/pdfjs/pdf.min.js';
+const WORKER_CDN = '/pdfjs/pdf.worker.min.js';
 
 export default function BookCover() {
   const canvasRef = useRef<HTMLCanvasElement>(null);

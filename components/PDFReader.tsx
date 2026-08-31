@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { TABLE_OF_CONTENTS, type TocEntry } from '@/lib/toc';
 
-const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-const WORKER_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFJS_CDN = '/pdfjs/pdf.min.js';
+const WORKER_CDN = '/pdfjs/pdf.worker.min.js';
 const PREVIEW_LIMIT = 10;
 
 interface PDFReaderProps {
