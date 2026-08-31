@@ -106,7 +106,7 @@ export default function ReaderPage() {
             </p>
             <Link href="/purchase"
               className="shrink-0 px-5 py-2 bg-gold text-navy-900 font-bold text-sm uppercase tracking-wider hover:bg-gold-light transition-colors rounded-sm">
-              Buy — £9.99
+              Buy — ₹51 / £9.99
             </Link>
           </div>
         </div>

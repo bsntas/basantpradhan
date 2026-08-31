@@ -18,5 +18,7 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ purchased: false });
   const { searchParams } = new URL(req.url);
   const bookId = searchParams.get('bookId') ?? 'koltey-golai';
-  return NextResponse.json({ purchased: await hasPurchased(session.userId, bookId) });
+  const { isVipEmail } = await import('@/lib/config');
+  const purchased = isVipEmail(session.email) || await hasPurchased(session.userId, bookId);
+  return NextResponse.json({ purchased });
 }

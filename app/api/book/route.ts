@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth';
 import { hasPurchased } from '@/lib/db';
+import { isVipEmail, BOOK_ID } from '@/lib/config';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
   }
 
-  const purchased = await hasPurchased(session.userId, 'koltey-golai');
+  const purchased = isVipEmail(session.email) || await hasPurchased(session.userId, BOOK_ID);
 
   if (!fs.existsSync(BOOK_PATH)) {
     return NextResponse.json({ error: 'Book not found' }, { status: 404 });
