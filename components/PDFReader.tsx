@@ -14,8 +14,6 @@ interface PDFReaderProps {
   onTextChange?: (text: string) => void;
 }
 
-type FlipState = 'idle' | 'out';
-
 function currentChapter(page: number): TocEntry | undefined {
   let ch: TocEntry | undefined;
   for (const entry of TABLE_OF_CONTENTS) {
@@ -26,17 +24,20 @@ function currentChapter(page: number): TocEntry | undefined {
 }
 
 export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT, onTextChange }: PDFReaderProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const topCanvasRef = useRef<HTMLCanvasElement>(null);
+  const bottomCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
+  // Ref-based guard to prevent concurrent flips without re-creating goToPage
+  const isFlippingRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [flipState, setFlipState] = useState<FlipState>('idle');
+  const [isFlipping, setIsFlipping] = useState(false);
   const [flipDir, setFlipDir] = useState<'forward' | 'backward'>('forward');
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [tocOpen, setTocOpen] = useState(false);
@@ -82,15 +83,17 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [loadDocument]);
 
-  // Scale is computed from the container dimensions at render time.
-  // The canvas buffer is rendered at physical pixels (fitScale × dpr) then displayed
-  // at CSS pixel size via style.width/height — produces crisp text on retina/mobile.
-  const renderPage = useCallback(async (pageNum: number) => {
-    if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
+  // Renders pageNum to any canvas at DPR-aware resolution. Returns CSS {w,h} or null on error.
+  const renderToCanvas = useCallback(async (
+    pageNum: number,
+    canvas: HTMLCanvasElement,
+    emitText: boolean,
+  ): Promise<{ w: number; h: number } | null> => {
+    if (!pdfDoc || !containerRef.current) return null;
     try {
       const page = await pdfDoc.getPage(pageNum);
       const { width: cW, height: cH } = containerRef.current.getBoundingClientRect();
-      if (cW === 0 || cH === 0) return;
+      if (cW === 0 || cH === 0) return null;
 
       const natural = page.getViewport({ scale: 1 });
       const scaleW = (cW - 48) / natural.width;
@@ -99,26 +102,34 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
       const dpr = window.devicePixelRatio || 1;
       const viewport = page.getViewport({ scale: fitScale * dpr });
-      const canvas = canvasRef.current;
       canvas.width = viewport.width;
       canvas.height = viewport.height;
-      // Display at CSS-pixel size so 1 canvas pixel = 1 physical pixel → sharp
-      const cssW = Math.round(viewport.width  / dpr);
+      const cssW = Math.round(viewport.width / dpr);
       const cssH = Math.round(viewport.height / dpr);
-      canvas.style.width  = `${cssW}px`;
+      canvas.style.width = `${cssW}px`;
       canvas.style.height = `${cssH}px`;
-      setCanvasSize({ w: cssW, h: cssH });
+
       const ctx = canvas.getContext('2d')!;
       await page.render({ canvasContext: ctx, viewport }).promise;
 
-      const tc = await page.getTextContent();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const text = tc.items.map((i: any) => i.str).join(' ').replace(/\s+/g, ' ').trim();
-      onTextChange?.(text);
+      if (emitText) {
+        const tc = await page.getTextContent();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = tc.items.map((i: any) => i.str).join(' ').replace(/\s+/g, ' ').trim();
+        onTextChange?.(text);
+      }
+
+      return { w: cssW, h: cssH };
     } catch {
-      // ignore render errors on page change
+      return null;
     }
   }, [pdfDoc, onTextChange]);
+
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!topCanvasRef.current) return;
+    const size = await renderToCanvas(pageNum, topCanvasRef.current, true);
+    if (size) setCanvasSize(size);
+  }, [renderToCanvas]);
 
   // Use rAF so layout is complete before we measure the container
   useEffect(() => {
@@ -136,15 +147,29 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   }, [currentPage, renderPage]);
 
   const goToPage = useCallback((newPage: number, dir: 'forward' | 'backward') => {
-    if (flipState !== 'idle' || newPage < 1 || newPage > maxPage) return;
+    if (isFlippingRef.current || newPage < 1 || newPage > maxPage) return;
+    if (!bottomCanvasRef.current || !topCanvasRef.current) return;
+
+    isFlippingRef.current = true;
     setFlipDir(dir);
-    setFlipState('out');
-    // After fold completes: snap to new page flat — no in-animation
-    setTimeout(() => {
+    setIsFlipping(true);
+
+    // Pre-render target page to bottom canvas immediately so it's already visible
+    // under the top canvas as the fold animation plays (no await — runs in parallel)
+    renderToCanvas(newPage, bottomCanvasRef.current, false);
+
+    // After fold animation completes, render new page to top canvas while it's
+    // at -90deg (invisible due to animation-fill-mode: forwards), then snap flat
+    setTimeout(async () => {
+      if (topCanvasRef.current) {
+        const size = await renderToCanvas(newPage, topCanvasRef.current, true);
+        if (size) setCanvasSize(size);
+      }
       setCurrentPage(newPage);
-      setFlipState('idle');
+      setIsFlipping(false);
+      isFlippingRef.current = false;
     }, 250);
-  }, [flipState, maxPage]);
+  }, [maxPage, renderToCanvas]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -165,9 +190,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     return () => document.removeEventListener('mousedown', handler);
   }, [tocOpen]);
 
-  const canvasClass = [
-    'block rounded-sm select-none relative z-10',
-    flipState === 'out'
+  const topCanvasClass = [
+    'block rounded-sm absolute top-0 left-0 z-10',
+    isFlipping
       ? (flipDir === 'forward' ? 'animate-flip-out-forward' : 'animate-flip-out-backward')
       : '',
   ].join(' ');
@@ -318,17 +343,25 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
           }
         }}
       >
-        {/* Wrapper sizes to canvas; underlay is the "next page" sitting below */}
+        {/* Two-canvas stack: bottom = target page already rendered; top = current page folds away */}
         <div
           className="relative shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
           style={canvasSize.w ? { width: canvasSize.w, height: canvasSize.h } : undefined}
         >
-          {canvasSize.w > 0 && (
-            <div className="absolute inset-0 rounded-sm bg-white" />
-          )}
+          {/* Bottom canvas: new page pre-rendered, revealed as top folds away */}
           <canvas
-            ref={canvasRef}
-            className={canvasClass}
+            ref={bottomCanvasRef}
+            className="block rounded-sm absolute top-0 left-0"
+            style={{
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              visibility: isFlipping ? 'visible' : 'hidden',
+            }}
+          />
+          {/* Top canvas: current page, animates out on navigation */}
+          <canvas
+            ref={topCanvasRef}
+            className={topCanvasClass}
             style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
           />
         </div>
