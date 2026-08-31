@@ -54,7 +54,13 @@ function writeFile(db: { users: User[] }): void {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require('path') as typeof import('path');
   const file = path.join(process.cwd(), 'data', 'users.json');
-  fs.writeFileSync(file, JSON.stringify(db, null, 2));
+  try {
+    fs.writeFileSync(file, JSON.stringify(db, null, 2));
+  } catch (err) {
+    // Vercel production filesystem is read-only — KV_REST_API_URL must be set
+    console.error('[db] writeFile failed (read-only filesystem?). Set KV_REST_API_URL in Vercel env vars.', err);
+    throw new Error('Database unavailable: set KV_REST_API_URL in Vercel environment variables');
+  }
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
