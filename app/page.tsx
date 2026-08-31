@@ -53,7 +53,7 @@ export default async function HomePage() {
                 <>
                   <Link href="/purchase"
                     className="px-8 py-4 bg-gold text-navy-900 font-bold text-sm uppercase tracking-wider hover:bg-gold-light transition-all rounded-sm shadow-lg shadow-gold/20">
-                    Buy Full Book — {PRICES.INR.display} / {PRICES.GBP.display}
+                    Buy Full Book — {PRICES.INR.display} / {PRICES.USD.display}
                   </Link>
                   {user ? (
                     <Link href="/reader"
@@ -98,11 +98,15 @@ export default async function HomePage() {
             </div>
           </div>
           <div className="flex justify-center">
-            <div className="w-48 h-48 rounded-full border-2 border-gold/30 flex items-center justify-center bg-navy-800"
-              style={{ boxShadow: '0 0 40px rgba(201,168,76,0.1)' }}>
-              <svg className="w-24 h-24 text-gold/30" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-              </svg>
+            <div className="relative w-64 h-72 rounded-lg overflow-hidden border-2 border-gold/30"
+              style={{ boxShadow: '0 0 40px rgba(201,168,76,0.15), 0 20px 60px rgba(0,0,0,0.3)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/author.jpg"
+                alt="Basant Pradhan"
+                className="w-full h-full object-cover object-top"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-navy-900/40 to-transparent pointer-events-none" />
             </div>
           </div>
         </div>
@@ -118,7 +122,7 @@ export default async function HomePage() {
               { label: 'Genre', value: 'Literary Fiction' },
               { label: 'Language', value: 'Nepali (नेपाली)' },
               { label: 'Format', value: 'Digital (Read Online)' },
-              { label: 'Price', value: `${PRICES.INR.display} / ${PRICES.GBP.display}` },
+              { label: 'Price', value: `${PRICES.INR.display} / ${PRICES.USD.display}` },
               { label: 'Access', value: 'Unlimited Reads' },
               { label: 'Features', value: 'Voice Narration' },
             ].map(({ label, value }) => (
@@ -139,7 +143,7 @@ export default async function HomePage() {
               <>
                 <Link href="/purchase"
                   className="px-10 py-4 bg-gold text-navy-900 font-bold uppercase tracking-wider hover:bg-gold-light transition-all rounded-sm">
-                  Buy Now — {PRICES.INR.display} / {PRICES.GBP.display}
+                  Buy Now — {PRICES.INR.display} / {PRICES.USD.display}
                 </Link>
                 {user ? (
                   <Link href="/reader"

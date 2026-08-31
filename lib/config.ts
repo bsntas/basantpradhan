@@ -1,8 +1,8 @@
 // ── Book pricing ─────────────────────────────────────────────
 // Update these values to change displayed / charged prices.
 export const PRICES = {
-  INR: { amount: 51,   symbol: '₹',  display: '₹51',    currency: 'INR' },
-  GBP: { amount: 9.99, symbol: '£',  display: '£9.99',  currency: 'GBP' },
+  INR: { amount: 51, symbol: '₹', display: '₹51', currency: 'INR' },
+  USD: { amount: 3,  symbol: '$', display: '$3',  currency: 'USD' },
 } as const;
 
 export type CurrencyCode = keyof typeof PRICES;

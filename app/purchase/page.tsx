@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PRICES, type CurrencyCode, DEFAULT_CURRENCY } from '@/lib/config';
+import { usePrefs } from '@/components/ThemeProvider';
 
 declare global {
   interface Window {
@@ -28,9 +29,18 @@ export default function PurchasePage() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const { currency: prefCurrency, setCurrency: setPrefCurrency } = usePrefs();
   const [currency, setCurrency] = useState<CurrencyCode>(DEFAULT_CURRENCY);
 
+  // Sync with saved preference once the client has hydrated
+  useEffect(() => { setCurrency(prefCurrency); }, [prefCurrency]);
+
   const price = PRICES[currency];
+
+  const handleCurrencyChange = (code: CurrencyCode) => {
+    setCurrency(code);
+    setPrefCurrency(code);
+  };
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -121,7 +131,7 @@ export default function PurchasePage() {
     if (currency === 'INR') {
       await handleINRPayment();
     } else {
-      // GBP: mock until Stripe is wired
+      // USD: mock until Stripe is wired
       setLoading(true);
       await completeMockPurchase();
     }
@@ -184,7 +194,7 @@ export default function PurchasePage() {
                 return (
                   <button
                     key={code}
-                    onClick={() => setCurrency(code)}
+                    onClick={() => handleCurrencyChange(code)}
                     className={[
                       'rounded-lg border p-4 text-left transition-all',
                       active
@@ -204,7 +214,7 @@ export default function PurchasePage() {
                       {p.display}
                     </p>
                     <p className="text-cream-300/40 text-xs mt-0.5">
-                      {code === 'INR' ? 'UPI · Cards · Net Banking' : 'Cards · International'}
+                      {code === 'INR' ? 'UPI · Cards · Net Banking' : 'Cards · International (USD)'}
                     </p>
                   </button>
                 );
@@ -226,7 +236,7 @@ export default function PurchasePage() {
               ) : (
                 <>
                   <span className="text-gold/70 font-medium">Demo mode</span>
-                  {' '}— Stripe integration (GBP) coming soon. Clicking below grants access immediately.
+                  {' '}— Stripe integration (USD) coming soon. Clicking below grants access immediately.
                 </>
               )}
             </p>

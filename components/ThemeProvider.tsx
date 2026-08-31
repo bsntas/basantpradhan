@@ -1,19 +1,24 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import type { CurrencyCode } from '@/lib/config';
 
 export type Theme = 'dark' | 'light' | 'system';
 
-interface ThemeContextValue {
+interface PrefsContextValue {
   theme: Theme;
   resolvedTheme: 'dark' | 'light';
   setTheme: (t: Theme) => void;
+  currency: CurrencyCode;
+  setCurrency: (c: CurrencyCode) => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue>({
+const PrefsContext = createContext<PrefsContextValue>({
   theme: 'dark',
   resolvedTheme: 'dark',
   setTheme: () => {},
+  currency: 'INR',
+  setCurrency: () => {},
 });
 
 function getSystemPreference(): 'dark' | 'light' {
@@ -30,11 +35,15 @@ function applyTheme(theme: Theme) {
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('dark');
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('dark');
+  const [currency, setCurrencyState] = useState<CurrencyCode>('INR');
 
   useEffect(() => {
-    const saved = (localStorage.getItem('bp_theme') as Theme) || 'dark';
-    setThemeState(saved);
-    setResolvedTheme(applyTheme(saved));
+    const savedTheme = (localStorage.getItem('bp_theme') as Theme) || 'dark';
+    setThemeState(savedTheme);
+    setResolvedTheme(applyTheme(savedTheme));
+
+    const savedCurrency = (localStorage.getItem('bp_currency') as CurrencyCode) || 'INR';
+    setCurrencyState(savedCurrency);
   }, []);
 
   useEffect(() => {
@@ -51,11 +60,17 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('bp_theme', t);
   }, []);
 
+  const setCurrency = useCallback((c: CurrencyCode) => {
+    setCurrencyState(c);
+    localStorage.setItem('bp_currency', c);
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme }}>
+    <PrefsContext.Provider value={{ theme, resolvedTheme, setTheme, currency, setCurrency }}>
       {children}
-    </ThemeContext.Provider>
+    </PrefsContext.Provider>
   );
 }
 
-export const useTheme = () => useContext(ThemeContext);
+export const useTheme = () => useContext(PrefsContext);
+export const usePrefs = () => useContext(PrefsContext);
