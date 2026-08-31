@@ -5,16 +5,21 @@ import { useEffect, useRef, useState } from 'react';
 const PDFJS_CDN = '/pdfjs/pdf.min.js';
 const WORKER_CDN = '/pdfjs/pdf.worker.min.js';
 
+// The cover PDF is a two-up spread (back cover left, front cover right).
+// We render the full spread offscreen and copy only the right half to the canvas.
+const FRONT_COVER_HALF = 'right'; // change to 'left' if your spread is reversed
+
 export default function BookCover() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
+  const [coverWidth, setCoverWidth] = useState(280);
+  const [coverHeight, setCoverHeight] = useState(390);
 
   useEffect(() => {
     let cancelled = false;
 
     async function render() {
-      // Load PDF.js if not already present
       if (!window.pdfjsLib) {
         await new Promise<void>((resolve, reject) => {
           const s = document.createElement('script');
@@ -35,18 +40,34 @@ export default function BookCover() {
       const page = await doc.getPage(1);
 
       if (!canvasRef.current || cancelled) return;
-
       const canvas = canvasRef.current;
-      const containerWidth = canvas.parentElement?.clientWidth ?? 300;
-      const viewport = page.getViewport({ scale: 1 });
-      const scale = containerWidth / viewport.width;
+
+      // Render full spread at a scale that makes the front-cover half ~280px wide
+      const fullViewport = page.getViewport({ scale: 1 });
+      const targetHalfWidth = canvas.parentElement?.clientWidth ?? 280;
+      const scale = (targetHalfWidth * 2) / fullViewport.width;
       const scaledViewport = page.getViewport({ scale });
 
-      canvas.width = scaledViewport.width;
-      canvas.height = scaledViewport.height;
+      // Render full spread to an offscreen canvas
+      const offscreen = document.createElement('canvas');
+      offscreen.width = scaledViewport.width;
+      offscreen.height = scaledViewport.height;
+      const offCtx = offscreen.getContext('2d')!;
+      await page.render({ canvasContext: offCtx, viewport: scaledViewport }).promise;
 
+      if (cancelled || !canvasRef.current) return;
+
+      // Copy only the front-cover half to the visible canvas
+      const halfW = Math.floor(scaledViewport.width / 2);
+      const srcX = FRONT_COVER_HALF === 'right' ? halfW : 0;
+
+      canvas.width = halfW;
+      canvas.height = scaledViewport.height;
       const ctx = canvas.getContext('2d')!;
-      await page.render({ canvasContext: ctx, viewport: scaledViewport }).promise;
+      ctx.drawImage(offscreen, srcX, 0, halfW, scaledViewport.height, 0, 0, halfW, scaledViewport.height);
+
+      setCoverWidth(halfW);
+      setCoverHeight(scaledViewport.height);
       if (!cancelled) setLoaded(true);
     }
 
@@ -55,7 +76,6 @@ export default function BookCover() {
   }, []);
 
   if (error) {
-    // Fallback to CSS book mockup if PDF can't load
     return <CSSBookMockup />;
   }
 
@@ -83,20 +103,18 @@ export default function BookCover() {
         </p>
       </div>
 
-      {/* Cover canvas */}
+      {/* Cover canvas — shows only the front-cover half */}
       <div
         className="relative overflow-hidden rounded-r-sm"
         style={{
           boxShadow: '8px 12px 48px rgba(0,0,0,0.7), 2px 2px 0 rgba(201,168,76,0.15)',
-          width: 280,
+          width: loaded ? coverWidth : 280,
+          minHeight: loaded ? coverHeight : 390,
         }}
         onContextMenu={e => e.preventDefault()}
       >
         {!loaded && (
-          <div
-            className="absolute inset-0 flex items-center justify-center bg-navy-800"
-            style={{ minHeight: 390 }}
-          >
+          <div className="absolute inset-0 flex items-center justify-center bg-navy-800">
             <div className="w-8 h-8 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
           </div>
         )}
@@ -116,7 +134,6 @@ export default function BookCover() {
   );
 }
 
-// CSS fallback (shown if PDF.js fails to load)
 function CSSBookMockup() {
   return (
     <div className="animate-float relative" style={{ width: 280, height: 390 }}>
