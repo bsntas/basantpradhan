@@ -1,8 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { TABLE_OF_CONTENTS, type TocEntry } from '@/lib/toc';
 import { BOOK_TEXT } from '@/lib/bookText';
+
+const VoiceControls = dynamic(() => import('@/components/VoiceControls'), { ssr: false });
 
 const PDFJS_CDN = '/pdfjs/pdf.min.js';
 const WORKER_CDN = '/pdfjs/pdf.worker.min.js';
@@ -12,7 +15,6 @@ interface PDFReaderProps {
   bookUrl: string;
   purchased: boolean;
   previewLimit?: number;
-  onTextChange?: (text: string) => void;
 }
 
 function currentChapter(page: number): TocEntry | undefined {
@@ -24,13 +26,13 @@ function currentChapter(page: number): TocEntry | undefined {
   return ch;
 }
 
-export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT, onTextChange }: PDFReaderProps) {
+export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT }: PDFReaderProps) {
   const topCanvasRef = useRef<HTMLCanvasElement>(null);
   const bottomCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const textScrollRef = useRef<HTMLDivElement>(null);
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
-  // Ref-based guard to prevent concurrent flips without re-creating goToPage
   const isFlippingRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
@@ -85,13 +87,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [loadDocument]);
 
-  // Renders pageNum to any canvas at DPR-aware resolution. Returns CSS {w,h} or null on error.
-  // Two-up landscape spreads (width > height * 1.4) are cropped to the right half so
-  // cover pages inserted as spreads display as a single portrait page.
+  // Renders pageNum to a canvas at DPR-aware resolution.
+  // Two-up landscape spreads are cropped to the right half.
   const renderToCanvas = useCallback(async (
     pageNum: number,
     canvas: HTMLCanvasElement,
-    emitText: boolean,
   ): Promise<{ w: number; h: number } | null> => {
     if (!pdfDoc || !containerRef.current) return null;
     try {
@@ -120,37 +120,29 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
       const ctx = canvas.getContext('2d')!;
       if (isSpread) {
-        // Translate left by half the full page width so only the right half renders into the canvas
         ctx.translate(-halfW, 0);
       }
       await page.render({ canvasContext: ctx, viewport }).promise;
-
-      if (emitText) {
-        const tc = await page.getTextContent();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const text = tc.items.map((i: any) => i.str).join(' ').replace(/\s+/g, ' ').trim();
-        onTextChange?.(text);
-      }
 
       return { w: cssW, h: cssH };
     } catch {
       return null;
     }
-  }, [pdfDoc, onTextChange]);
+  }, [pdfDoc]);
 
   const renderPage = useCallback(async (pageNum: number) => {
     if (!topCanvasRef.current) return;
-    const size = await renderToCanvas(pageNum, topCanvasRef.current, true);
+    const size = await renderToCanvas(pageNum, topCanvasRef.current);
     if (size) setCanvasSize(size);
   }, [renderToCanvas]);
 
-  // Use rAF so layout is complete before we measure the container
+  // Use rAF so layout is complete before measuring the container
   useEffect(() => {
     const raf = requestAnimationFrame(() => renderPage(currentPage));
     return () => cancelAnimationFrame(raf);
   }, [currentPage, renderPage]);
 
-  // ResizeObserver re-renders on container resize (catches mobile toolbar show/hide)
+  // ResizeObserver re-renders on container resize
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -159,30 +151,43 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     return () => observer.disconnect();
   }, [currentPage, renderPage]);
 
+  // Reset text scroll to top on page change in text mode
+  useEffect(() => {
+    if (viewMode === 'text' && textScrollRef.current) {
+      textScrollRef.current.scrollTop = 0;
+    }
+  }, [currentPage, viewMode]);
+
   const goToPage = useCallback((newPage: number, dir: 'forward' | 'backward') => {
-    if (isFlippingRef.current || newPage < 1 || newPage > maxPage) return;
+    if (newPage < 1 || newPage > maxPage) return;
+
+    // Text mode: instant navigation, no canvas animation
+    if (viewMode === 'text') {
+      setCurrentPage(newPage);
+      return;
+    }
+
+    if (isFlippingRef.current) return;
     if (!bottomCanvasRef.current || !topCanvasRef.current) return;
 
     isFlippingRef.current = true;
     setFlipDir(dir);
     setIsFlipping(true);
 
-    // Pre-render target page to bottom canvas immediately so it's already visible
-    // under the top canvas as the fold animation plays (no await — runs in parallel)
-    renderToCanvas(newPage, bottomCanvasRef.current, false);
+    // Pre-render target page to bottom canvas so it's visible under the fold
+    renderToCanvas(newPage, bottomCanvasRef.current);
 
-    // After fold animation completes, render new page to top canvas while it's
-    // at -90deg (invisible due to animation-fill-mode: forwards), then snap flat
+    // After fold completes, re-render top canvas while it's at -90° (invisible)
     setTimeout(async () => {
       if (topCanvasRef.current) {
-        const size = await renderToCanvas(newPage, topCanvasRef.current, true);
+        const size = await renderToCanvas(newPage, topCanvasRef.current);
         if (size) setCanvasSize(size);
       }
       setCurrentPage(newPage);
       setIsFlipping(false);
       isFlippingRef.current = false;
     }, 250);
-  }, [maxPage, renderToCanvas]);
+  }, [maxPage, renderToCanvas, viewMode]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -192,12 +197,6 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [currentPage, goToPage]);
-
-  // In text view, emit the current page's text for VoiceControls
-  useEffect(() => {
-    if (viewMode !== 'text') return;
-    onTextChange?.(BOOK_TEXT[currentPage] ?? '');
-  }, [viewMode, currentPage, onTextChange]);
 
   useEffect(() => {
     if (!tocOpen) return;
@@ -217,6 +216,22 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   ].join(' ');
 
   const activeToc = currentChapter(currentPage);
+
+  // Text view: detect chapter start and split title from body
+  const isChapterStart = TABLE_OF_CONTENTS.some(e => e.page === currentPage);
+  const rawText = BOOK_TEXT[currentPage] ?? '';
+  let headingText = '';
+  let bodyText = rawText;
+  if (isChapterStart && rawText) {
+    const nlIdx = rawText.indexOf('\n');
+    if (nlIdx !== -1) {
+      headingText = rawText.slice(0, nlIdx).trim();
+      bodyText = rawText.slice(nlIdx + 1).trim();
+    } else {
+      headingText = rawText;
+      bodyText = '';
+    }
+  }
 
   if (loading) {
     return (
@@ -375,48 +390,92 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         onTouchEnd={e => {
           const dx = e.changedTouches[0].clientX - touchStartX.current;
           const dy = e.changedTouches[0].clientY - touchStartY.current;
-          // Only fire on predominantly horizontal swipes of at least 40px
           if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
             if (dx < 0) goToPage(currentPage + 1, 'forward');
             else        goToPage(currentPage - 1, 'backward');
           }
         }}
       >
-        {viewMode === 'pdf' ? (
-          /* ── PDF canvas stack ──────────────────────────────────── */
+        {/* ── PDF canvas stack — always mounted; hidden in text mode so sizing stays ready ── */}
+        <div
+          className="relative shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
+          style={{
+            ...(canvasSize.w ? { width: canvasSize.w, height: canvasSize.h } : {}),
+            display: viewMode === 'pdf' ? undefined : 'none',
+          }}
+        >
+          {/* Bottom canvas: new page pre-rendered, revealed as top folds away */}
+          <canvas
+            ref={bottomCanvasRef}
+            className="block rounded-sm absolute top-0 left-0"
+            style={{
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+              visibility: isFlipping ? 'visible' : 'hidden',
+            }}
+          />
+          {/* Top canvas: current page, animates out on navigation */}
+          <canvas
+            ref={topCanvasRef}
+            className={topCanvasClass}
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          />
+        </div>
+
+        {/* ── Text view: book-page layout ─────────────────────────── */}
+        {viewMode === 'text' && (
           <div
-            className="relative shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
-            style={canvasSize.w ? { width: canvasSize.w, height: canvasSize.h } : undefined}
+            ref={textScrollRef}
+            className="overflow-y-auto shadow-[0_8px_40px_rgba(0,0,0,0.6)] rounded-sm bg-navy-900/80 border border-gold/10"
+            style={{
+              width:  canvasSize.w || 520,
+              height: canvasSize.h || '85%',
+            }}
           >
-            {/* Bottom canvas: new page pre-rendered, revealed as top folds away */}
-            <canvas
-              ref={bottomCanvasRef}
-              className="block rounded-sm absolute top-0 left-0"
-              style={{
-                userSelect: 'none',
-                WebkitUserSelect: 'none',
-                visibility: isFlipping ? 'visible' : 'hidden',
-              }}
-            />
-            {/* Top canvas: current page, animates out on navigation */}
-            <canvas
-              ref={topCanvasRef}
-              className={topCanvasClass}
-              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-            />
-          </div>
-        ) : (
-          /* ── Text view ─────────────────────────────────────────── */
-          <div className="w-full h-full overflow-y-auto px-6 py-8 sm:px-12 lg:px-20">
-            <div className="max-w-2xl mx-auto">
-              {BOOK_TEXT[currentPage] ? (
-                <div className="text-cream-200 leading-relaxed text-[15px] sm:text-base whitespace-pre-wrap font-[Lato,sans-serif] select-text">
-                  {BOOK_TEXT[currentPage]}
+            <div className="px-8 sm:px-12 py-10 min-h-full flex flex-col">
+
+              {/* Chapter heading — shown on chapter-start pages */}
+              {headingText ? (
+                <div className="text-center mb-8">
+                  <h2
+                    className="text-gold text-2xl font-bold leading-snug"
+                    style={{ fontFamily: "'Noto Serif Devanagari', serif" }}
+                  >
+                    {headingText}
+                  </h2>
+                  {isChapterStart && activeToc?.titleEn && (
+                    <p className="text-cream-300/40 text-sm mt-1.5 italic font-sans tracking-wide">
+                      {activeToc.titleEn}
+                    </p>
+                  )}
+                  <div className="mt-5 flex items-center gap-3 justify-center">
+                    <div className="h-px w-12 bg-gold/25" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-gold/40" />
+                    <div className="h-px w-12 bg-gold/25" />
+                  </div>
                 </div>
-              ) : (
-                <p className="text-cream-300/40 text-center text-sm italic mt-8">
-                  यस पृष्ठमा पाठ उपलब्ध छैन।<br/>
-                  <span className="text-xs">No text available for this page.</span>
+              ) : null}
+
+              {/* Body text */}
+              {bodyText ? (
+                <p
+                  className="text-cream-200 text-[15.5px] leading-[2.2] text-justify flex-1 select-text"
+                  style={{ fontFamily: "'Noto Serif Devanagari', 'Noto Serif', serif" }}
+                >
+                  {bodyText}
+                </p>
+              ) : !headingText ? (
+                <p className="text-cream-300/35 text-center text-sm italic mt-10">
+                  यस पृष्ठमा पाठ उपलब्ध छैन।
+                  <br />
+                  <span className="text-xs text-cream-300/25">No text available for this page.</span>
+                </p>
+              ) : null}
+
+              {/* Printed page number at bottom */}
+              {currentPage > 2 && (
+                <p className="text-cream-300/20 text-[11px] text-center mt-10 font-mono tracking-widest select-none">
+                  — {currentPage - 2} —
                 </p>
               )}
             </div>
@@ -498,6 +557,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
           <span className="hidden sm:inline">← → arrow keys · swipe on touch screens</span>
         </p>
       </div>
+
+      {/* ── Voice controls — text mode only ─────────────────────── */}
+      {viewMode === 'text' && (
+        <VoiceControls text={BOOK_TEXT[currentPage] ?? ''} />
+      )}
     </div>
   );
 }

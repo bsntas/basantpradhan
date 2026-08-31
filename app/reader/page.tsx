@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 const PDFReader = dynamic(() => import('@/components/PDFReader'), { ssr: false });
-const VoiceControls = dynamic(() => import('@/components/VoiceControls'), { ssr: false });
 
 interface UserState {
   name: string;
@@ -18,7 +17,6 @@ export default function ReaderPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserState | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [pageText, setPageText] = useState('');
 
   useEffect(() => {
     fetch('/api/auth/me').then(r => r.json()).then(d => {
@@ -27,10 +25,6 @@ export default function ReaderPage() {
       setAuthLoading(false);
     });
   }, [router]);
-
-  const handleTextChange = useCallback((text: string) => {
-    setPageText(text);
-  }, []);
 
   if (authLoading) {
     return (
@@ -87,11 +81,8 @@ export default function ReaderPage() {
           bookUrl="/api/book"
           purchased={purchased}
           previewLimit={10}
-          onTextChange={handleTextChange}
         />
       </main>
-
-      <VoiceControls text={pageText} />
 
       {/* Purchase banner — sits below the reader, doesn't push content up inside reader */}
       {!purchased && (
