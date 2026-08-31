@@ -60,29 +60,20 @@ body {
 }
 
 /* ── Page fold animations ────────────────────────────── */
-/* Forward: left edge is the spine — right side folds away, new page unfolds from behind-left */
+/* Old page folds away revealing the new page underneath — no in-animation. */
+/* Forward: left edge is the spine; right side folds away */
 @keyframes foldOutForward {
   from { transform: rotateY(0deg);   }
   to   { transform: rotateY(-90deg); }
 }
-@keyframes foldInForward {
-  from { transform: rotateY(-90deg); }
-  to   { transform: rotateY(0deg);   }
-}
-/* Backward: right edge is the spine — left side folds away, previous page unfolds from behind-right */
+/* Backward: right edge is the spine; left side folds away */
 @keyframes foldOutBackward {
   from { transform: rotateY(0deg);  }
   to   { transform: rotateY(90deg); }
 }
-@keyframes foldInBackward {
-  from { transform: rotateY(90deg); }
-  to   { transform: rotateY(0deg);  }
-}
 
-.animate-flip-out-forward  { transform-origin: left center;  animation: foldOutForward  0.25s ease-in  forwards; }
-.animate-flip-in-forward   { transform-origin: left center;  animation: foldInForward   0.25s ease-out forwards; }
-.animate-flip-out-backward { transform-origin: right center; animation: foldOutBackward 0.25s ease-in  forwards; }
-.animate-flip-in-backward  { transform-origin: right center; animation: foldInBackward  0.25s ease-out forwards; }
+.animate-flip-out-forward  { transform-origin: left center;  animation: foldOutForward  0.25s ease-in forwards; }
+.animate-flip-out-backward { transform-origin: right center; animation: foldOutBackward 0.25s ease-in forwards; }
 
 /* ── Shimmer text effect ─────────────────────────────── */
 .shimmer-text {

@@ -14,7 +14,7 @@ interface PDFReaderProps {
   onTextChange?: (text: string) => void;
 }
 
-type FlipState = 'idle' | 'out' | 'in';
+type FlipState = 'idle' | 'out';
 
 function currentChapter(page: number): TocEntry | undefined {
   let ch: TocEntry | undefined;
@@ -38,6 +38,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const [error, setError] = useState('');
   const [flipState, setFlipState] = useState<FlipState>('idle');
   const [flipDir, setFlipDir] = useState<'forward' | 'backward'>('forward');
+  const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [tocOpen, setTocOpen] = useState(false);
 
   const maxPage = purchased ? totalPages : Math.min(previewLimit, totalPages);
@@ -102,8 +103,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       canvas.width = viewport.width;
       canvas.height = viewport.height;
       // Display at CSS-pixel size so 1 canvas pixel = 1 physical pixel → sharp
-      canvas.style.width  = `${Math.round(viewport.width  / dpr)}px`;
-      canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
+      const cssW = Math.round(viewport.width  / dpr);
+      const cssH = Math.round(viewport.height / dpr);
+      canvas.style.width  = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      setCanvasSize({ w: cssW, h: cssH });
       const ctx = canvas.getContext('2d')!;
       await page.render({ canvasContext: ctx, viewport }).promise;
 
@@ -135,8 +139,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     if (flipState !== 'idle' || newPage < 1 || newPage > maxPage) return;
     setFlipDir(dir);
     setFlipState('out');
-    setTimeout(() => { setCurrentPage(newPage); setFlipState('in'); }, 250);
-    setTimeout(() => { setFlipState('idle'); }, 500);
+    // After fold completes: snap to new page flat — no in-animation
+    setTimeout(() => {
+      setCurrentPage(newPage);
+      setFlipState('idle');
+    }, 250);
   }, [flipState, maxPage]);
 
   useEffect(() => {
@@ -159,11 +166,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   }, [tocOpen]);
 
   const canvasClass = [
-    'block rounded-sm shadow-[0_8px_40px_rgba(0,0,0,0.6)] select-none',
+    'block rounded-sm select-none relative z-10',
     flipState === 'out'
       ? (flipDir === 'forward' ? 'animate-flip-out-forward' : 'animate-flip-out-backward')
-      : flipState === 'in'
-      ? (flipDir === 'forward' ? 'animate-flip-in-forward' : 'animate-flip-in-backward')
       : '',
   ].join(' ');
 
@@ -313,11 +318,20 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
           }
         }}
       >
-        <canvas
-          ref={canvasRef}
-          className={canvasClass}
-          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-        />
+        {/* Wrapper sizes to canvas; underlay is the "next page" sitting below */}
+        <div
+          className="relative shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
+          style={canvasSize.w ? { width: canvasSize.w, height: canvasSize.h } : undefined}
+        >
+          {canvasSize.w > 0 && (
+            <div className="absolute inset-0 rounded-sm bg-white" />
+          )}
+          <canvas
+            ref={canvasRef}
+            className={canvasClass}
+            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+          />
+        </div>
 
         {/* Preview gate overlay */}
         {!purchased && currentPage >= maxPage && (
