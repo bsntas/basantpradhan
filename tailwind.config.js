@@ -27,6 +27,7 @@ module.exports = {
       fontFamily: {
         serif: ['Playfair Display', 'Georgia', 'serif'],
         sans: ['Lato', 'Helvetica', 'Arial', 'sans-serif'],
+        devanagari: ['"Noto Serif Devanagari"', 'serif'],
       },
       animation: {
         float: 'float 6s ease-in-out infinite',

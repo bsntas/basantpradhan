@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   }
 
   const user = await findUserByEmail(email);
-  if (!user || !(await verifyPassword(password, user.password))) {
+  if (!user || !user.password || !(await verifyPassword(password, user.password))) {
     return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
   }
 

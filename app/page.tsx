@@ -29,18 +29,17 @@ export default async function HomePage() {
         <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-24 grid lg:grid-cols-2 gap-16 items-center">
           {/* Left: text */}
           <div className="animate-fade-in">
-            <p className="text-gold/70 text-sm uppercase tracking-[0.3em] mb-4 font-sans">Debut Novel</p>
-            <h1 className="font-serif text-6xl lg:text-7xl xl:text-8xl leading-none mb-6">
-              <span className="shimmer-text">Koltey</span>
+            <p className="text-gold/70 text-sm uppercase tracking-[0.3em] mb-4 font-sans">प्रथम उपन्यास · Debut Novel</p>
+            <h1 className="font-serif text-6xl lg:text-7xl xl:text-8xl leading-none mb-3">
+              <span className="shimmer-text">कोल्टे</span>
               <br />
-              <span className="text-cream-100">Golai</span>
+              <span className="text-cream-100">गोलाई</span>
             </h1>
-            <p className="text-gold font-serif text-xl italic mb-8">by Basant Pradhan</p>
+            <p className="text-cream-300/50 font-sans text-base tracking-widest mb-3">Koltey Golai</p>
+            <p className="text-gold font-serif text-xl italic mb-8">— Basant Pradhan</p>
             <p className="text-cream-300 text-lg leading-relaxed mb-10 max-w-lg">
-              A poignant tale set in the misty hills of Darjeeling, where the lives of ordinary
-              people intersect in extraordinary ways. Through vivid prose and deeply drawn
-              characters, Basant Pradhan weaves a story of love, loss, and the enduring spirit
-              of a community caught between tradition and change.
+              दार्जिलिङका धुँधले पहाडहरूमा आधारित एक संवेदनशील कथा, जहाँ साधारण मानिसहरूको जीवन असाधारण तरिकाले गाँसिएको छ।
+              प्रेम, क्षति र परम्परा तथा परिवर्तनबीच झुलिरहेको समुदायको अटल आत्मालाई बसन्त प्रधानले जीवन्त गद्यमा उकेरेका छन्।
             </p>
 
             <div className="flex flex-wrap gap-4">
@@ -82,19 +81,18 @@ export default async function HomePage() {
       <section className="py-24 px-6 lg:px-8 border-t border-gold/10">
         <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-16 items-center">
           <div>
-            <p className="text-gold text-sm uppercase tracking-[0.3em] mb-4">About the Author</p>
-            <h2 className="font-serif text-4xl text-cream-100 mb-6">Basant Pradhan</h2>
+            <p className="text-gold text-sm uppercase tracking-[0.3em] mb-4">लेखकको बारेमा · About the Author</p>
+            <h2 className="font-serif text-4xl text-cream-100 mb-6">बसन्त प्रधान</h2>
             <div className="space-y-4 text-cream-300 leading-relaxed">
               <p>
-                Basant Pradhan is a writer rooted in the hills of Darjeeling whose voice captures
-                the spirit of a land straddling cultures, histories, and longings. His writing
-                draws deeply from the lived experiences of the hill communities — their joys,
-                struggles, and the quiet resilience that defines them.
+                बसन्त प्रधान दार्जिलिङका पहाडहरूमा जरा गाडेका एक लेखक हुन् जसको आवाजले दुई संस्कृति, इतिहास र तरसाइहरूका बीच उभिएको धरातलको भावना समाउँछ।
+                उनको लेखन पहाडी समुदायको जीवन अनुभवबाट गहिरो रूपमा उनिएको छ।
               </p>
               <p>
-                <em>Koltey Golai</em> is his debut novel, a work that has been years in the making —
-                a love letter to the places and people that shaped him, told in prose that is
-                at once intimate and universal.
+                <em>कोल्टे गोलाई</em> उनको प्रथम उपन्यास हो — वर्षौँको मेहनतले तयार भएको एक कृति, जुन उनलाई आकार दिने ठाउँहरू र मानिसहरूलाई प्रेमपत्र हो।
+              </p>
+              <p className="text-cream-300/50 text-sm italic">
+                Basant Pradhan is a writer rooted in the hills of Darjeeling whose debut novel <em>Koltey Golai</em> is a love letter to the hill communities — their joys, struggles, and quiet resilience.
               </p>
             </div>
           </div>
@@ -112,12 +110,12 @@ export default async function HomePage() {
       {/* ── BOOK DETAILS ─────────────────────────────────── */}
       <section className="py-24 px-6 lg:px-8 border-t border-gold/10 bg-navy-950/50">
         <div className="max-w-4xl mx-auto text-center">
-          <p className="text-gold text-sm uppercase tracking-[0.3em] mb-4">The Book</p>
-          <h2 className="font-serif text-4xl text-cream-100 mb-12">About Koltey Golai</h2>
+          <p className="text-gold text-sm uppercase tracking-[0.3em] mb-4">पुस्तकको बारेमा · The Book</p>
+          <h2 className="font-serif text-4xl text-cream-100 mb-12">कोल्टे गोलाई</h2>
           <div className="grid md:grid-cols-3 gap-8 text-left mb-12">
             {[
               { label: 'Genre', value: 'Literary Fiction' },
-              { label: 'Language', value: 'English' },
+              { label: 'Language', value: 'Nepali (नेपाली)' },
               { label: 'Format', value: 'Digital (Read Online)' },
               { label: 'Price', value: '£9.99' },
               { label: 'Access', value: 'Unlimited Reads' },

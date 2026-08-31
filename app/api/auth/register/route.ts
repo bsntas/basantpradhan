@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createUser, toPublicUser } from '@/lib/db';
+import { createUser, findUserByEmail, toPublicUser } from '@/lib/db';
 import { createToken, authCookieHeader } from '@/lib/auth';
 
 export async function POST(req: NextRequest) {
@@ -11,10 +11,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
   }
 
-  const user = await createUser(email, password, name);
-  if (!user) {
+  const existing = await findUserByEmail(email);
+  if (existing) {
     return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
   }
+  const user = await createUser({ email, password, name });
 
   const token = await createToken({ userId: user.id, email: user.email, name: user.name });
   const res = NextResponse.json({ user: toPublicUser(user) }, { status: 201 });

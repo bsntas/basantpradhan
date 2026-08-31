@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 export interface User {
   id: string;
   email: string;
-  password: string;
+  password: string | null; // null for OAuth (Google) users
   name: string;
   purchases: string[];
   createdAt: string;
@@ -59,26 +59,25 @@ function writeFile(db: { users: User[] }): void {
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
-export async function createUser(email: string, password: string, name: string): Promise<User | null> {
-  const normalEmail = email.toLowerCase();
-  const hashed = await bcrypt.hash(password, 10);
+export async function createUser(
+  args: { email: string; name: string; password: string | null },
+): Promise<User> {
+  const normalEmail = args.email.toLowerCase();
+  const hashed = args.password ? await bcrypt.hash(args.password, 10) : null;
   const user: User = {
     id: uuidv4(),
     email: normalEmail,
     password: hashed,
-    name,
+    name: args.name,
     purchases: [],
     createdAt: new Date().toISOString(),
   };
 
   if (useKV()) {
-    const exists = await kvGet<string>(`email:${normalEmail}`);
-    if (exists) return null;
     await kvSet(`user:${user.id}`, user);
     await kvSet(`email:${normalEmail}`, user.id);
   } else {
     const db = readFile();
-    if (db.users.find(u => u.email === normalEmail)) return null;
     db.users.push(user);
     writeFile(db);
   }
