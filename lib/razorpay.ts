@@ -1,7 +1,8 @@
 import crypto from 'crypto';
+import type RazorpayType from 'razorpay';
 
 // Lazy-init the Razorpay client so missing env vars don't crash at module load.
-let _client: InstanceType<typeof import('razorpay')['default']> | null = null;
+let _client: RazorpayType | null = null;
 
 export function getRazorpay() {
   const keyId = process.env.RAZORPAY_KEY_ID;
@@ -10,7 +11,7 @@ export function getRazorpay() {
   if (!_client) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Razorpay = require('razorpay');
-    _client = new Razorpay({ key_id: keyId, key_secret: keySecret });
+    _client = new Razorpay({ key_id: keyId, key_secret: keySecret }) as RazorpayType;
   }
   return _client!;
 }
