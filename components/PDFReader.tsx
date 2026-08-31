@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { TABLE_OF_CONTENTS, type TocEntry } from '@/lib/toc';
+import { BOOK_TEXT } from '@/lib/bookText';
 
 const PDFJS_CDN = '/pdfjs/pdf.min.js';
 const WORKER_CDN = '/pdfjs/pdf.worker.min.js';
@@ -41,6 +42,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const [flipDir, setFlipDir] = useState<'forward' | 'backward'>('forward');
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [tocOpen, setTocOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'pdf' | 'text'>('pdf');
 
   const maxPage = purchased ? totalPages : Math.min(previewLimit, totalPages);
 
@@ -191,6 +193,12 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     return () => window.removeEventListener('keydown', handler);
   }, [currentPage, goToPage]);
 
+  // In text view, emit the current page's text for VoiceControls
+  useEffect(() => {
+    if (viewMode !== 'text') return;
+    onTextChange?.(BOOK_TEXT[currentPage] ?? '');
+  }, [viewMode, currentPage, onTextChange]);
+
   useEffect(() => {
     if (!tocOpen) return;
     const handler = (e: MouseEvent) => {
@@ -256,6 +264,26 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
               <span className="text-cream-300/25"> of {totalPages}</span>
             )}
           </span>
+          <div className="w-px h-4 bg-gold/15" />
+          {/* View mode toggle: PDF ↔ Text */}
+          <button
+            onClick={() => setViewMode(m => m === 'pdf' ? 'text' : 'pdf')}
+            className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded transition-colors ${
+              viewMode === 'text' ? 'text-gold bg-gold/10' : 'text-cream-300/55 hover:text-gold hover:bg-white/5'
+            }`}
+            title={viewMode === 'pdf' ? 'Switch to text view' : 'Switch to PDF view'}
+          >
+            {viewMode === 'pdf' ? (
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM8 16h8v2H8v-2zm0-4h8v2H8v-2zm0-4h5v2H8V8z"/>
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/>
+              </svg>
+            )}
+            <span className="hidden sm:inline">{viewMode === 'pdf' ? 'पाठ' : 'PDF'}</span>
+          </button>
           <div className="w-px h-4 bg-gold/15" />
           <button
             onClick={() => setTocOpen(o => !o)}
@@ -334,11 +362,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         </div>
       )}
 
-      {/* ── Canvas area — flex-1 min-h-0 lets it shrink to fit ───── */}
+      {/* ── Canvas / Text area ───────────────────────────────────── */}
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 flex items-center justify-center overflow-hidden"
-        style={{ perspective: '1200px' }}
+        className="flex-1 min-h-0 flex items-center justify-center overflow-hidden relative"
+        style={viewMode === 'pdf' ? { perspective: '1200px' } : undefined}
         onContextMenu={e => e.preventDefault()}
         onTouchStart={e => {
           touchStartX.current = e.touches[0].clientX;
@@ -354,28 +382,46 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
           }
         }}
       >
-        {/* Two-canvas stack: bottom = target page already rendered; top = current page folds away */}
-        <div
-          className="relative shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
-          style={canvasSize.w ? { width: canvasSize.w, height: canvasSize.h } : undefined}
-        >
-          {/* Bottom canvas: new page pre-rendered, revealed as top folds away */}
-          <canvas
-            ref={bottomCanvasRef}
-            className="block rounded-sm absolute top-0 left-0"
-            style={{
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              visibility: isFlipping ? 'visible' : 'hidden',
-            }}
-          />
-          {/* Top canvas: current page, animates out on navigation */}
-          <canvas
-            ref={topCanvasRef}
-            className={topCanvasClass}
-            style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
-          />
-        </div>
+        {viewMode === 'pdf' ? (
+          /* ── PDF canvas stack ──────────────────────────────────── */
+          <div
+            className="relative shadow-[0_8px_40px_rgba(0,0,0,0.6)]"
+            style={canvasSize.w ? { width: canvasSize.w, height: canvasSize.h } : undefined}
+          >
+            {/* Bottom canvas: new page pre-rendered, revealed as top folds away */}
+            <canvas
+              ref={bottomCanvasRef}
+              className="block rounded-sm absolute top-0 left-0"
+              style={{
+                userSelect: 'none',
+                WebkitUserSelect: 'none',
+                visibility: isFlipping ? 'visible' : 'hidden',
+              }}
+            />
+            {/* Top canvas: current page, animates out on navigation */}
+            <canvas
+              ref={topCanvasRef}
+              className={topCanvasClass}
+              style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
+            />
+          </div>
+        ) : (
+          /* ── Text view ─────────────────────────────────────────── */
+          <div className="w-full h-full overflow-y-auto px-6 py-8 sm:px-12 lg:px-20">
+            <div className="max-w-2xl mx-auto">
+              {BOOK_TEXT[currentPage] ? (
+                <div className="text-cream-200 leading-relaxed text-[15px] sm:text-base whitespace-pre-wrap font-[Lato,sans-serif] select-text">
+                  {BOOK_TEXT[currentPage]}
+                </div>
+              ) : (
+                <p className="text-cream-300/40 text-center text-sm italic mt-8">
+                  यस पृष्ठमा पाठ उपलब्ध छैन।<br/>
+                  <span className="text-xs">No text available for this page.</span>
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Preview gate overlay */}
         {!purchased && currentPage >= maxPage && (
