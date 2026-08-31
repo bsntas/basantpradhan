@@ -1,11 +1,12 @@
 import { getServerUser } from '@/lib/auth';
 import { findUserById } from '@/lib/db';
-import { isVipEmail, PRICES, BOOK_ID } from '@/lib/config';
+import { isVipEmail, BOOK_ID } from '@/lib/config';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 
 const BookCover = dynamic(() => import('@/components/BookCover'), { ssr: false });
+const PriceText = dynamic(() => import('@/components/PriceText'), { ssr: false });
 
 export default async function HomePage() {
   const session = await getServerUser();
@@ -53,7 +54,7 @@ export default async function HomePage() {
                 <>
                   <Link href="/purchase"
                     className="px-8 py-4 bg-gold text-navy-900 font-bold text-sm uppercase tracking-wider hover:bg-gold-light transition-all rounded-sm shadow-lg shadow-gold/20">
-                    Buy Full Book — {PRICES.INR.display} / {PRICES.USD.display}
+                    Buy Full Book — <PriceText />
                   </Link>
                   {user ? (
                     <Link href="/reader"
@@ -122,7 +123,6 @@ export default async function HomePage() {
               { label: 'Genre', value: 'Literary Fiction' },
               { label: 'Language', value: 'Nepali (नेपाली)' },
               { label: 'Format', value: 'Digital (Read Online)' },
-              { label: 'Price', value: `${PRICES.INR.display} / ${PRICES.USD.display}` },
               { label: 'Access', value: 'Unlimited Reads' },
               { label: 'Features', value: 'Voice Narration' },
             ].map(({ label, value }) => (
@@ -131,6 +131,10 @@ export default async function HomePage() {
                 <p className="text-cream-200 font-medium">{value}</p>
               </div>
             ))}
+            <div className="border border-gold/10 rounded-lg p-4 bg-navy-800/50">
+              <p className="text-gold/70 text-xs uppercase tracking-wider mb-1">Price</p>
+              <p className="text-cream-200 font-medium"><PriceText /></p>
+            </div>
           </div>
 
           <div className="flex justify-center gap-4 flex-wrap">
@@ -143,7 +147,7 @@ export default async function HomePage() {
               <>
                 <Link href="/purchase"
                   className="px-10 py-4 bg-gold text-navy-900 font-bold uppercase tracking-wider hover:bg-gold-light transition-all rounded-sm">
-                  Buy Now — {PRICES.INR.display} / {PRICES.USD.display}
+                  Buy Now — <PriceText />
                 </Link>
                 {user ? (
                   <Link href="/reader"

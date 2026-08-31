@@ -111,6 +111,15 @@ export default function RegisterPage() {
           <Link href="/login" className="text-gold hover:text-gold-light transition-colors">साइन इन गर्नुहोस्</Link>
           <span className="text-cream-300/30"> (Sign In)</span>
         </p>
+
+        <div className="mt-5 pt-5 border-t border-gold/10 text-center">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-cream-300/40 hover:text-cream-300/70 text-xs transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to home
+          </Link>
+        </div>
       </div>
     </div>
   );
