@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get('error');
 
   if (error || !code) {
-    return NextResponse.redirect(new URL('/login?error=google', req.url));
+    const params = new URLSearchParams({ error: 'google', reason: error ?? 'no_code' });
+    return NextResponse.redirect(new URL(`/login?${params}`, req.url));
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
@@ -34,10 +35,15 @@ export async function GET(req: NextRequest) {
       }),
     });
 
-    if (!tokenRes.ok) throw new Error('token exchange failed');
+    if (!tokenRes.ok) {
+      const body = await tokenRes.json().catch(() => ({}));
+      const reason = (body as { error?: string }).error ?? 'token_failed';
+      console.error('[google-oauth] token exchange failed:', reason, 'redirect_uri:', redirectUri);
+      const params = new URLSearchParams({ error: 'google', reason });
+      return NextResponse.redirect(new URL(`/login?${params}`, req.url));
+    }
     const tokenData = await tokenRes.json();
 
-    // Fetch user profile from Google
     const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
@@ -48,19 +54,18 @@ export async function GET(req: NextRequest) {
     const email: string = googleUser.email;
     const name: string = googleUser.name ?? email.split('@')[0];
 
-    // Find or create user in our database
     let user = await findUserByEmail(email);
     if (!user) {
       user = await createUser({ name, email, password: null });
     }
 
-    // Issue our own JWT
     const token = await createToken({ userId: user.id, email: user.email, name: user.name });
 
     const response = NextResponse.redirect(new URL('/', req.url));
     response.headers.set('Set-Cookie', authCookieHeader(token));
     return response;
-  } catch {
-    return NextResponse.redirect(new URL('/login?error=google', req.url));
+  } catch (err) {
+    console.error('[google-oauth] unexpected error:', err);
+    return NextResponse.redirect(new URL('/login?error=google&reason=unexpected', req.url));
   }
 }

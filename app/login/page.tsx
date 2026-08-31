@@ -14,6 +14,7 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
 
   const oauthError = searchParams.get('error');
+  const oauthReason = searchParams.get('reason');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,9 +57,15 @@ function LoginForm() {
 
         {(error || oauthError) && (
           <div className="mb-6 p-3 bg-red-900/30 border border-red-500/30 rounded text-red-300 text-sm text-center">
-            {oauthError === 'google' ? 'Google sign-in failed. Please try again.' :
-             oauthError === 'config' ? 'Google login is not configured yet.' :
-             error}
+            {oauthError === 'google' && oauthReason === 'redirect_uri_mismatch'
+              ? 'Google OAuth redirect URI mismatch — please contact the site owner.'
+              : oauthError === 'google' && oauthReason
+              ? `Google sign-in failed (${oauthReason}). Please try again.`
+              : oauthError === 'google'
+              ? 'Google sign-in failed. Please try again.'
+              : oauthError === 'config'
+              ? 'Google login is not configured yet.'
+              : error}
           </div>
         )}
 
