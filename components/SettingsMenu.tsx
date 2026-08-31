@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useTheme, type Theme } from './ThemeProvider';
+import { usePrefs, type Theme } from './ThemeProvider';
+import { PRICES, type CurrencyCode } from '@/lib/config';
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: React.ReactNode }[] = [
   {
@@ -38,7 +39,7 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: React.ReactNode }[] = 
 
 export default function SettingsMenu() {
   const [open, setOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, currency, setCurrency } = usePrefs();
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -74,8 +75,9 @@ export default function SettingsMenu() {
 
       {/* Dropdown panel */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-52 rounded-md shadow-xl border border-gold/20 bg-navy-800 z-[100]">
-          <div className="p-4">
+        <div className="absolute right-0 top-full mt-2 w-56 rounded-md shadow-xl border border-gold/20 bg-navy-800 z-[100]">
+          {/* Appearance */}
+          <div className="p-4 border-b border-gold/10">
             <p className="text-gold/70 text-xs uppercase tracking-[0.2em] mb-3 font-sans">
               Appearance
             </p>
@@ -94,6 +96,34 @@ export default function SettingsMenu() {
                   <span className="tracking-wide">{label}</span>
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Currency */}
+          <div className="p-4">
+            <p className="text-gold/70 text-xs uppercase tracking-[0.2em] mb-3 font-sans">
+              Currency
+            </p>
+            <div className="flex gap-1.5">
+              {(Object.keys(PRICES) as CurrencyCode[]).map(code => {
+                const price = PRICES[code];
+                const active = currency === code;
+                return (
+                  <button
+                    key={code}
+                    onClick={() => { setCurrency(code); setOpen(false); }}
+                    className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 px-1 rounded text-xs font-medium border transition-all ${
+                      active
+                        ? 'border-gold bg-gold/15 text-gold'
+                        : 'border-gold/20 text-cream-300 hover:border-gold/40 hover:text-cream-200 hover:bg-navy-700/50'
+                    }`}
+                  >
+                    <span className="font-serif text-base leading-none">{price.symbol}</span>
+                    <span className="tracking-wide">{code}</span>
+                    <span className="text-[10px] opacity-60">{price.display}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

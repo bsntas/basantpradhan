@@ -53,7 +53,7 @@ export default async function HomePage() {
                 <>
                   <Link href="/purchase"
                     className="px-8 py-4 bg-gold text-navy-900 font-bold text-sm uppercase tracking-wider hover:bg-gold-light transition-all rounded-sm shadow-lg shadow-gold/20">
-                    Buy Full Book — {PRICES.INR.display} / {PRICES.GBP.display}
+                    Buy Full Book — {PRICES.INR.display} / {PRICES.USD.display}
                   </Link>
                   {user ? (
                     <Link href="/reader"
@@ -118,7 +118,7 @@ export default async function HomePage() {
               { label: 'Genre', value: 'Literary Fiction' },
               { label: 'Language', value: 'Nepali (नेपाली)' },
               { label: 'Format', value: 'Digital (Read Online)' },
-              { label: 'Price', value: `${PRICES.INR.display} / ${PRICES.GBP.display}` },
+              { label: 'Price', value: `${PRICES.INR.display} / ${PRICES.USD.display}` },
               { label: 'Access', value: 'Unlimited Reads' },
               { label: 'Features', value: 'Voice Narration' },
             ].map(({ label, value }) => (
@@ -139,7 +139,7 @@ export default async function HomePage() {
               <>
                 <Link href="/purchase"
                   className="px-10 py-4 bg-gold text-navy-900 font-bold uppercase tracking-wider hover:bg-gold-light transition-all rounded-sm">
-                  Buy Now — {PRICES.INR.display} / {PRICES.GBP.display}
+                  Buy Now — {PRICES.INR.display} / {PRICES.USD.display}
                 </Link>
                 {user ? (
                   <Link href="/reader"
