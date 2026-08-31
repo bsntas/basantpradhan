@@ -34,7 +34,7 @@ export default function ReaderPage() {
 
   if (authLoading) {
     return (
-      <div className="h-screen bg-navy-950 flex items-center justify-center">
+      <div className="h-[100dvh] bg-navy-950 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
       </div>
     );
@@ -45,7 +45,7 @@ export default function ReaderPage() {
   const purchased = user.purchases.includes('koltey-golai');
 
   return (
-    <div className="h-screen overflow-hidden bg-navy-950 flex flex-col">
+    <div className="h-[100dvh] overflow-hidden bg-navy-950 flex flex-col">
       {/* Top bar */}
       <header className="shrink-0 z-30 bg-navy-900/95 backdrop-blur-sm border-b border-gold/15 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto h-14 flex items-center justify-between">

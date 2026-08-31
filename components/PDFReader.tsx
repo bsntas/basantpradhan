@@ -28,6 +28,8 @@ function currentChapter(page: number): TocEntry | undefined {
 export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT, onTextChange }: PDFReaderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -79,8 +81,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [loadDocument]);
 
-  // Scale is computed from the container dimensions at render time, not stored as state.
-  // This makes the page fill height AND width, whichever is the binding constraint.
+  // Scale is computed from the container dimensions at render time.
+  // The canvas buffer is rendered at physical pixels (fitScale × dpr) then displayed
+  // at CSS pixel size via style.width/height — produces crisp text on retina/mobile.
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     try {
@@ -93,10 +96,14 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       const scaleH = (cH - 48) / natural.height;
       const fitScale = Math.min(scaleW, scaleH, 2.5);
 
-      const viewport = page.getViewport({ scale: fitScale });
+      const dpr = window.devicePixelRatio || 1;
+      const viewport = page.getViewport({ scale: fitScale * dpr });
       const canvas = canvasRef.current;
       canvas.width = viewport.width;
       canvas.height = viewport.height;
+      // Display at CSS-pixel size so 1 canvas pixel = 1 physical pixel → sharp
+      canvas.style.width  = `${Math.round(viewport.width  / dpr)}px`;
+      canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
       const ctx = canvas.getContext('2d')!;
       await page.render({ canvasContext: ctx, viewport }).promise;
 
@@ -109,14 +116,19 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [pdfDoc, onTextChange]);
 
+  // Use rAF so layout is complete before we measure the container
   useEffect(() => {
-    renderPage(currentPage);
+    const raf = requestAnimationFrame(() => renderPage(currentPage));
+    return () => cancelAnimationFrame(raf);
   }, [currentPage, renderPage]);
 
+  // ResizeObserver re-renders on container resize (catches mobile toolbar show/hide)
   useEffect(() => {
-    const handler = () => renderPage(currentPage);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => renderPage(currentPage));
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [currentPage, renderPage]);
 
   const goToPage = useCallback((newPage: number, dir: 'forward' | 'backward') => {
@@ -287,6 +299,19 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         className="flex-1 min-h-0 flex items-center justify-center overflow-hidden"
         style={{ perspective: '1200px' }}
         onContextMenu={e => e.preventDefault()}
+        onTouchStart={e => {
+          touchStartX.current = e.touches[0].clientX;
+          touchStartY.current = e.touches[0].clientY;
+        }}
+        onTouchEnd={e => {
+          const dx = e.changedTouches[0].clientX - touchStartX.current;
+          const dy = e.changedTouches[0].clientY - touchStartY.current;
+          // Only fire on predominantly horizontal swipes of at least 40px
+          if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)) {
+            if (dx < 0) goToPage(currentPage + 1, 'forward');
+            else        goToPage(currentPage - 1, 'backward');
+          }
+        }}
       >
         <canvas
           ref={canvasRef}
@@ -364,8 +389,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
             </svg>
           </button>
         </div>
-        <p className="text-cream-300/25 text-[10px] text-center mt-1">
-          ← → तीर कुञ्जीहरू प्रयोग गर्नुहोस् · Use arrow keys to navigate
+        <p className="text-cream-300/25 text-[10px] text-center mt-1 select-none">
+          <span className="sm:hidden">swipe left / right to navigate</span>
+          <span className="hidden sm:inline">← → arrow keys · swipe on touch screens</span>
         </p>
       </div>
     </div>
