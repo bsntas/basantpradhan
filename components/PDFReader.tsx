@@ -79,8 +79,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [loadDocument]);
 
-  // Scale is computed from the container dimensions at render time, not stored as state.
-  // This makes the page fill height AND width, whichever is the binding constraint.
+  // Scale is computed from the container dimensions at render time.
+  // The canvas buffer is rendered at physical pixels (fitScale × dpr) then displayed
+  // at CSS pixel size via style.width/height — produces crisp text on retina/mobile.
   const renderPage = useCallback(async (pageNum: number) => {
     if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     try {
@@ -93,10 +94,14 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       const scaleH = (cH - 48) / natural.height;
       const fitScale = Math.min(scaleW, scaleH, 2.5);
 
-      const viewport = page.getViewport({ scale: fitScale });
+      const dpr = window.devicePixelRatio || 1;
+      const viewport = page.getViewport({ scale: fitScale * dpr });
       const canvas = canvasRef.current;
       canvas.width = viewport.width;
       canvas.height = viewport.height;
+      // Display at CSS-pixel size so 1 canvas pixel = 1 physical pixel → sharp
+      canvas.style.width  = `${Math.round(viewport.width  / dpr)}px`;
+      canvas.style.height = `${Math.round(viewport.height / dpr)}px`;
       const ctx = canvas.getContext('2d')!;
       await page.render({ canvasContext: ctx, viewport }).promise;
 
@@ -109,14 +114,19 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [pdfDoc, onTextChange]);
 
+  // Use rAF so layout is complete before we measure the container
   useEffect(() => {
-    renderPage(currentPage);
+    const raf = requestAnimationFrame(() => renderPage(currentPage));
+    return () => cancelAnimationFrame(raf);
   }, [currentPage, renderPage]);
 
+  // ResizeObserver re-renders on container resize (catches mobile toolbar show/hide)
   useEffect(() => {
-    const handler = () => renderPage(currentPage);
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
+    const container = containerRef.current;
+    if (!container) return;
+    const observer = new ResizeObserver(() => renderPage(currentPage));
+    observer.observe(container);
+    return () => observer.disconnect();
   }, [currentPage, renderPage]);
 
   const goToPage = useCallback((newPage: number, dir: 'forward' | 'backward') => {
