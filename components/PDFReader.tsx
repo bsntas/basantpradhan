@@ -27,6 +27,7 @@ function currentChapter(page: number): TocEntry | undefined {
 
 export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_LIMIT, onTextChange }: PDFReaderProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,12 +36,10 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const [error, setError] = useState('');
   const [flipState, setFlipState] = useState<FlipState>('idle');
   const [flipDir, setFlipDir] = useState<'forward' | 'backward'>('forward');
-  const [scale, setScale] = useState(1.4);
   const [tocOpen, setTocOpen] = useState(false);
 
   const maxPage = purchased ? totalPages : Math.min(previewLimit, totalPages);
 
-  // Load PDF.js from CDN
   useEffect(() => {
     if (window.pdfjsLib) return;
     const script = document.createElement('script');
@@ -80,11 +79,21 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [loadDocument]);
 
+  // Scale is computed from the container dimensions at render time, not stored as state.
+  // This makes the page fill height AND width, whichever is the binding constraint.
   const renderPage = useCallback(async (pageNum: number) => {
-    if (!pdfDoc || !canvasRef.current) return;
+    if (!pdfDoc || !canvasRef.current || !containerRef.current) return;
     try {
       const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
+      const { width: cW, height: cH } = containerRef.current.getBoundingClientRect();
+      if (cW === 0 || cH === 0) return;
+
+      const natural = page.getViewport({ scale: 1 });
+      const scaleW = (cW - 48) / natural.width;
+      const scaleH = (cH - 48) / natural.height;
+      const fitScale = Math.min(scaleW, scaleH, 2.5);
+
+      const viewport = page.getViewport({ scale: fitScale });
       const canvas = canvasRef.current;
       canvas.width = viewport.width;
       canvas.height = viewport.height;
@@ -98,39 +107,26 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     } catch {
       // ignore render errors on page change
     }
-  }, [pdfDoc, scale, onTextChange]);
+  }, [pdfDoc, onTextChange]);
 
   useEffect(() => {
     renderPage(currentPage);
   }, [currentPage, renderPage]);
 
-  // Adjust scale to fit container
   useEffect(() => {
-    const updateScale = () => {
-      const containerWidth = Math.min(window.innerWidth - 48, 900);
-      setScale(containerWidth / 595);
-    };
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, []);
+    const handler = () => renderPage(currentPage);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, [currentPage, renderPage]);
 
   const goToPage = useCallback((newPage: number, dir: 'forward' | 'backward') => {
     if (flipState !== 'idle' || newPage < 1 || newPage > maxPage) return;
     setFlipDir(dir);
     setFlipState('out');
-
-    setTimeout(() => {
-      setCurrentPage(newPage);
-      setFlipState('in');
-    }, 250);
-
-    setTimeout(() => {
-      setFlipState('idle');
-    }, 500);
+    setTimeout(() => { setCurrentPage(newPage); setFlipState('in'); }, 250);
+    setTimeout(() => { setFlipState('idle'); }, 500);
   }, [flipState, maxPage]);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goToPage(currentPage + 1, 'forward');
@@ -140,7 +136,6 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     return () => window.removeEventListener('keydown', handler);
   }, [currentPage, goToPage]);
 
-  // Close TOC on outside click
   useEffect(() => {
     if (!tocOpen) return;
     const handler = (e: MouseEvent) => {
@@ -152,7 +147,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   }, [tocOpen]);
 
   const canvasClass = [
-    'block rounded shadow-2xl select-none max-w-full',
+    'block rounded-sm shadow-[0_8px_40px_rgba(0,0,0,0.6)] select-none',
     flipState === 'out'
       ? (flipDir === 'forward' ? 'animate-flip-out-forward' : 'animate-flip-out-backward')
       : flipState === 'in'
@@ -161,12 +156,10 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   ].join(' ');
 
   const activeToc = currentChapter(currentPage);
-  // Only show TOC entries that are within the readable range
-  const visibleToc = TABLE_OF_CONTENTS.filter(e => purchased || e.page <= maxPage);
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
+      <div className="flex flex-col items-center justify-center h-full gap-4">
         <div className="w-12 h-12 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
         <p className="text-cream-300 text-sm">पुस्तक लोड हुँदैछ…</p>
       </div>
@@ -175,7 +168,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 gap-4">
+      <div className="flex flex-col items-center justify-center h-full gap-4">
         <p className="text-red-400">{error}</p>
         <button onClick={loadDocument} className="px-4 py-2 bg-gold text-navy-900 rounded text-sm font-medium">Retry</button>
       </div>
@@ -183,41 +176,63 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   }
 
   return (
-    <div className="flex flex-col items-center gap-6 py-6 relative">
-      {/* Top bar: chapter label + TOC toggle */}
-      <div className="w-full flex items-center justify-between max-w-3xl px-2">
-        <div className="text-xs text-cream-300/60 font-sans">
+    <div className="h-full flex flex-col relative">
+
+      {/* ── Info bar ─────────────────────────────────────────────── */}
+      <div className="shrink-0 flex items-center justify-between px-4 sm:px-6 h-10 border-b border-gold/10 bg-navy-900/60">
+        <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+          {!purchased && (
+            <span className="shrink-0 text-[10px] font-semibold tracking-wide text-gold bg-gold/10 border border-gold/20 px-2 py-0.5 rounded-full uppercase">
+              Preview
+            </span>
+          )}
           {activeToc ? (
-            <span>
-              <span className="text-gold">{activeToc.title}</span>
-              {activeToc.titleEn && <span className="ml-2 text-cream-300/40">({activeToc.titleEn})</span>}
+            <span className="text-xs text-cream-300/60 truncate">
+              <span className="text-gold/80">{activeToc.title}</span>
+              {activeToc.titleEn && (
+                <span className="ml-2 text-cream-300/35 hidden sm:inline">{activeToc.titleEn}</span>
+              )}
             </span>
           ) : null}
         </div>
 
-        <button
-          onClick={() => setTocOpen(o => !o)}
-          className="flex items-center gap-2 text-cream-300/70 hover:text-gold transition-colors text-xs font-medium"
-          title="Table of Contents / विषय-सूची"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3 9h14V7H3v2zm0 4h14v-2H3v2zm0 4h14v-2H3v2zm16 0h2v-2h-2v2zm0-10v2h2V7h-2zm0 6h2v-2h-2v2z"/>
-          </svg>
-          विषय-सूची
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs text-cream-300/45 tabular-nums font-mono">
+            {currentPage}&thinsp;/&thinsp;{maxPage}
+            {!purchased && totalPages > 0 && (
+              <span className="text-cream-300/25"> of {totalPages}</span>
+            )}
+          </span>
+          <div className="w-px h-4 bg-gold/15" />
+          <button
+            onClick={() => setTocOpen(o => !o)}
+            className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded transition-colors ${
+              tocOpen ? 'text-gold bg-gold/10' : 'text-cream-300/55 hover:text-gold hover:bg-white/5'
+            }`}
+            title="Table of Contents / विषय-सूची"
+          >
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M3 9h14V7H3v2zm0 4h14v-2H3v2zm0 4h14v-2H3v2zm16 0h2v-2h-2v2zm0-10v2h2V7h-2zm0 6h2v-2h-2v2z"/>
+            </svg>
+            <span className="hidden sm:inline">विषय-सूची</span>
+          </button>
+        </div>
       </div>
 
-      {/* TOC drawer */}
+      {/* ── TOC drawer ───────────────────────────────────────────── */}
       {tocOpen && (
         <div
           id="toc-panel"
-          className="absolute top-12 right-4 z-40 w-72 bg-navy-800 border border-gold/20 rounded-xl shadow-2xl overflow-hidden"
+          className="absolute top-10 right-0 z-40 w-72 bg-navy-800 border border-gold/20 rounded-bl-xl shadow-2xl overflow-hidden"
         >
           <div className="px-4 py-3 border-b border-gold/10 flex items-center justify-between">
-            <h3 className="text-cream-100 font-serif text-sm">विषय-सूची <span className="text-cream-300/40 font-sans text-xs ml-1">Contents</span></h3>
-            <button onClick={() => setTocOpen(false)} className="text-cream-300/50 hover:text-gold text-lg leading-none">×</button>
+            <h3 className="text-cream-100 font-serif text-sm">
+              विषय-सूची
+              <span className="text-cream-300/35 font-sans text-xs ml-2">Contents</span>
+            </h3>
+            <button onClick={() => setTocOpen(false)} className="text-cream-300/50 hover:text-gold text-xl leading-none">×</button>
           </div>
-          <ul className="max-h-96 overflow-y-auto py-2">
+          <ul className="max-h-[min(24rem,60vh)] overflow-y-auto py-2">
             {TABLE_OF_CONTENTS.map((entry) => {
               const isActive = activeToc?.page === entry.page;
               const isLocked = !purchased && entry.page > maxPage;
@@ -232,7 +247,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
                     }}
                     disabled={isLocked}
                     className={[
-                      'w-full text-left px-4 py-2.5 flex items-center justify-between gap-2 transition-colors',
+                      'w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 transition-colors',
                       isActive ? 'bg-gold/15 text-gold' : 'text-cream-300 hover:bg-navy-700',
                       isLocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
                     ].join(' ')}
@@ -266,39 +281,28 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         </div>
       )}
 
-      {/* Preview warning */}
-      {!purchased && (
-        <div className="bg-gold/10 border border-gold/30 rounded-lg px-4 py-3 text-center max-w-lg">
-          <p className="text-gold text-sm font-medium">
-            पूर्वावलोकन — पृष्ठ १–{Math.min(previewLimit, totalPages)} / {totalPages}
-          </p>
-          <p className="text-cream-300/70 text-xs mt-1">
-            Preview Mode · Purchase the full book to read all {totalPages} pages.
-          </p>
-        </div>
-      )}
-
-      {/* Canvas container */}
+      {/* ── Canvas area — flex-1 min-h-0 lets it shrink to fit ───── */}
       <div
-        className="relative overflow-hidden rounded-lg shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+        ref={containerRef}
+        className="flex-1 min-h-0 flex items-center justify-center overflow-hidden"
         style={{ perspective: '1200px' }}
         onContextMenu={e => e.preventDefault()}
       >
         <canvas
           ref={canvasRef}
           className={canvasClass}
-          style={{ display: 'block', userSelect: 'none', WebkitUserSelect: 'none' }}
+          style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
         />
 
         {/* Preview gate overlay */}
         {!purchased && currentPage >= maxPage && (
-          <div className="absolute inset-0 bg-navy-900/90 backdrop-blur-sm flex flex-col items-center justify-center gap-4 rounded-lg">
-            <svg className="w-16 h-16 text-gold/60" fill="currentColor" viewBox="0 0 24 24">
+          <div className="absolute inset-0 bg-navy-900/92 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
+            <svg className="w-14 h-14 text-gold/55" fill="currentColor" viewBox="0 0 24 24">
               <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
             </svg>
             <h3 className="text-cream-100 font-serif text-2xl">कथा जारी राख्नुहोस्</h3>
-            <p className="text-cream-300/80 text-sm">Continue the story</p>
-            <p className="text-cream-300 text-center max-w-xs text-sm">
+            <p className="text-cream-300/70 text-sm">Continue the story</p>
+            <p className="text-cream-300 text-center max-w-xs text-sm px-4">
               नि:शुल्क पूर्वावलोकन समाप्त भयो। पूरा पुस्तक पढ्न किन्नुहोस्।
             </p>
             <a href="/purchase" className="mt-2 px-6 py-3 bg-gold text-navy-900 rounded font-semibold hover:bg-gold-light transition-colors">
@@ -308,50 +312,62 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         )}
       </div>
 
-      {/* Navigation controls */}
-      <div className="flex items-center gap-6">
-        <button
-          onClick={() => goToPage(1, 'backward')}
-          disabled={currentPage <= 1}
-          className="p-2 text-cream-300 hover:text-gold disabled:opacity-30 transition-colors"
-          title="First page / पहिलो पृष्ठ"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6 1.41-1.41zm-6 0L7.82 12l4.59-4.59L11 6l-6 6 6 6 1.41-1.41z"/></svg>
-        </button>
-        <button
-          onClick={() => goToPage(currentPage - 1, 'backward')}
-          disabled={currentPage <= 1}
-          className="px-6 py-2.5 bg-navy-800 border border-gold/30 text-cream-200 hover:bg-navy-700 disabled:opacity-30 transition-all rounded flex items-center gap-2"
-        >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
-          अघिल्लो
-        </button>
+      {/* ── Navigation bar ───────────────────────────────────────── */}
+      <div className="shrink-0 bg-navy-900/70 border-t border-gold/10 px-4 py-2.5">
+        <div className="flex items-center justify-center gap-2 sm:gap-3">
+          <button
+            onClick={() => goToPage(1, 'backward')}
+            disabled={currentPage <= 1}
+            className="p-2 text-cream-300/50 hover:text-gold disabled:opacity-25 transition-colors rounded hover:bg-white/5"
+            title="First page"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6 6 6 1.41-1.41zm-6 0L7.82 12l4.59-4.59L11 6l-6 6 6 6 1.41-1.41z"/>
+            </svg>
+          </button>
 
-        <div className="text-center">
-          <span className="text-gold font-serif text-lg">{currentPage}</span>
-          <span className="text-cream-300/60 text-sm"> / {maxPage}</span>
-          {!purchased && <span className="text-cream-300/40 text-xs block">पूर्वावलोकन</span>}
+          <button
+            onClick={() => goToPage(currentPage - 1, 'backward')}
+            disabled={currentPage <= 1}
+            className="flex items-center gap-1.5 px-4 py-2 bg-navy-800 border border-gold/20 text-cream-200 hover:bg-navy-700 hover:border-gold/35 disabled:opacity-25 transition-all rounded text-sm"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+            </svg>
+            <span className="hidden sm:inline">अघिल्लो</span>
+          </button>
+
+          <div className="text-center min-w-[3.5rem]">
+            <span className="text-gold font-serif text-lg tabular-nums">{currentPage}</span>
+            <span className="text-cream-300/45 text-sm"> / {maxPage}</span>
+          </div>
+
+          <button
+            onClick={() => goToPage(currentPage + 1, 'forward')}
+            disabled={currentPage >= maxPage}
+            className="flex items-center gap-1.5 px-4 py-2 bg-navy-800 border border-gold/20 text-cream-200 hover:bg-navy-700 hover:border-gold/35 disabled:opacity-25 transition-all rounded text-sm"
+          >
+            <span className="hidden sm:inline">अर्को</span>
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+            </svg>
+          </button>
+
+          <button
+            onClick={() => goToPage(maxPage, 'forward')}
+            disabled={currentPage >= maxPage}
+            className="p-2 text-cream-300/50 hover:text-gold disabled:opacity-25 transition-colors rounded hover:bg-white/5"
+            title="Last page"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6-1.41 1.41zm6 0L16.18 12l-4.59 4.59L13 18l6-6-6-6-1.41 1.41z"/>
+            </svg>
+          </button>
         </div>
-
-        <button
-          onClick={() => goToPage(currentPage + 1, 'forward')}
-          disabled={currentPage >= maxPage}
-          className="px-6 py-2.5 bg-navy-800 border border-gold/30 text-cream-200 hover:bg-navy-700 disabled:opacity-30 transition-all rounded flex items-center gap-2"
-        >
-          अर्को
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
-        </button>
-        <button
-          onClick={() => goToPage(maxPage, 'forward')}
-          disabled={currentPage >= maxPage}
-          className="p-2 text-cream-300 hover:text-gold disabled:opacity-30 transition-colors"
-          title="Last page / अन्तिम पृष्ठ"
-        >
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6-6-6-1.41 1.41zm6 0L16.18 12l-4.59 4.59L13 18l6-6-6-6-1.41 1.41z"/></svg>
-        </button>
+        <p className="text-cream-300/25 text-[10px] text-center mt-1">
+          ← → तीर कुञ्जीहरू प्रयोग गर्नुहोस् · Use arrow keys to navigate
+        </p>
       </div>
-
-      <p className="text-cream-300/40 text-xs">← → तीर कुञ्जीहरू प्रयोग गर्नुहोस् &nbsp;·&nbsp; Use arrow keys to navigate</p>
     </div>
   );
 }

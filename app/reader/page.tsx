@@ -34,7 +34,7 @@ export default function ReaderPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-navy-950 flex items-center justify-center">
+      <div className="h-screen bg-navy-950 flex items-center justify-center">
         <div className="w-12 h-12 border-4 border-gold/20 border-t-gold rounded-full animate-spin" />
       </div>
     );
@@ -45,9 +45,9 @@ export default function ReaderPage() {
   const purchased = user.purchases.includes('koltey-golai');
 
   return (
-    <div className="min-h-screen bg-navy-950 flex flex-col">
+    <div className="h-screen overflow-hidden bg-navy-950 flex flex-col">
       {/* Top bar */}
-      <header className="sticky top-0 z-30 bg-navy-900/95 backdrop-blur-sm border-b border-gold/15 px-4 sm:px-6">
+      <header className="shrink-0 z-30 bg-navy-900/95 backdrop-blur-sm border-b border-gold/15 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-cream-300/60 hover:text-gold transition-colors">
@@ -81,24 +81,21 @@ export default function ReaderPage() {
         </div>
       </header>
 
-      {/* Reader area */}
-      <main className="flex-1 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          <PDFReader
-            bookUrl="/api/book"
-            purchased={purchased}
-            previewLimit={10}
-            onTextChange={handleTextChange}
-          />
-        </div>
+      {/* Reader fills all remaining space — no padding so PDFReader owns its layout */}
+      <main className="flex-1 min-h-0 overflow-hidden relative">
+        <PDFReader
+          bookUrl="/api/book"
+          purchased={purchased}
+          previewLimit={10}
+          onTextChange={handleTextChange}
+        />
       </main>
 
-      {/* Voice controls floating button */}
       <VoiceControls text={pageText} />
 
-      {/* Purchase banner for preview users */}
+      {/* Purchase banner — sits below the reader, doesn't push content up inside reader */}
       {!purchased && (
-        <div className="sticky bottom-0 z-20 bg-navy-900/95 backdrop-blur-sm border-t border-gold/20 px-4 py-3">
+        <div className="shrink-0 z-20 bg-navy-900/95 backdrop-blur-sm border-t border-gold/20 px-4 py-3">
           <div className="max-w-5xl mx-auto flex items-center justify-between gap-4">
             <p className="text-cream-300 text-sm">
               <span className="text-gold font-medium">Enjoying the preview?</span>
