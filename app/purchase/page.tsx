@@ -5,6 +5,24 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PRICES, type CurrencyCode, DEFAULT_CURRENCY } from '@/lib/config';
 
+declare global {
+  interface Window {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    Razorpay: new (options: Record<string, any>) => { open(): void };
+  }
+}
+
+function loadScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(s);
+  });
+}
+
 export default function PurchasePage() {
   const router = useRouter();
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
@@ -22,8 +40,73 @@ export default function PurchasePage() {
     });
   }, [router]);
 
-  const completePurchase = async () => {
+  const handleINRPayment = async () => {
     setLoading(true);
+    try {
+      await loadScript('https://checkout.razorpay.com/v1/checkout.js');
+
+      const orderRes = await fetch('/api/purchase/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: 'INR' }),
+      });
+
+      if (!orderRes.ok) {
+        const err = await orderRes.json();
+        // Fall back to mock if Razorpay not configured
+        if (orderRes.status === 503) {
+          await completeMockPurchase();
+          return;
+        }
+        alert(err.error ?? 'Could not create order');
+        setLoading(false);
+        return;
+      }
+
+      const { orderId, amount, currency: orderCurrency, keyId } = await orderRes.json();
+
+      const rzp = new window.Razorpay({
+        key: keyId,
+        amount,
+        currency: orderCurrency,
+        order_id: orderId,
+        name: 'Basant Pradhan',
+        description: 'कोल्टे गोलाई — Koltey Golai',
+        prefill: { email: user?.email ?? '', name: user?.name ?? '' },
+        theme: { color: '#c9a84c' },
+        handler: async (response: {
+          razorpay_order_id: string;
+          razorpay_payment_id: string;
+          razorpay_signature: string;
+        }) => {
+          const verifyRes = await fetch('/api/purchase/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+            }),
+          });
+          if (verifyRes.ok) {
+            router.push('/reader');
+          } else {
+            alert('Payment verification failed. Contact support.');
+            setLoading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => setLoading(false),
+        },
+      });
+      rzp.open();
+    } catch {
+      setLoading(false);
+      alert('Failed to load payment gateway. Please try again.');
+    }
+  };
+
+  const completeMockPurchase = async () => {
     const res = await fetch('/api/purchase', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -32,6 +115,16 @@ export default function PurchasePage() {
     setLoading(false);
     if (res.ok) router.push('/reader');
     else router.push('/login');
+  };
+
+  const completePurchase = async () => {
+    if (currency === 'INR') {
+      await handleINRPayment();
+    } else {
+      // GBP: mock until Stripe is wired
+      setLoading(true);
+      await completeMockPurchase();
+    }
   };
 
   if (checkingAuth) {
@@ -119,14 +212,23 @@ export default function PurchasePage() {
             </div>
           </div>
 
-          {/* Mock payment notice */}
+          {/* Payment method notice */}
           <div className="border border-gold/10 rounded-lg p-4 mb-6 bg-navy-900/30 flex items-start gap-3">
             <svg className="w-5 h-5 text-gold/50 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
             </svg>
             <p className="text-cream-300/50 text-xs leading-relaxed">
-              <span className="text-gold/70 font-medium">Demo mode</span> — payment gateway integration (Razorpay / Stripe) coming soon.
-              Clicking below grants access immediately without charging.
+              {currency === 'INR' ? (
+                <>
+                  <span className="text-gold/70 font-medium">Razorpay</span>
+                  {' '}— UPI, credit/debit cards, net banking & wallets accepted.
+                </>
+              ) : (
+                <>
+                  <span className="text-gold/70 font-medium">Demo mode</span>
+                  {' '}— Stripe integration (GBP) coming soon. Clicking below grants access immediately.
+                </>
+              )}
             </p>
           </div>
 
