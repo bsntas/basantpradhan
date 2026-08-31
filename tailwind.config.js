@@ -1,5 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+  darkMode: 'class',
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
@@ -12,16 +13,16 @@ module.exports = {
         'gold-light': '#e8c85a',
         'gold-dark': '#a07a30',
         navy: {
-          950: '#04070f',
-          900: '#0a0e1a',
-          800: '#0f1629',
-          700: '#1a2744',
-          600: '#1e2f5c',
+          950: 'var(--color-navy-950)',
+          900: 'var(--color-navy-900)',
+          800: 'var(--color-navy-800)',
+          700: 'var(--color-navy-700)',
+          600: 'var(--color-navy-600)',
         },
         cream: {
-          100: '#f9f6f0',
-          200: '#f5f0e8',
-          300: '#e8dcc8',
+          100: 'var(--color-cream-100)',
+          200: 'var(--color-cream-200)',
+          300: 'var(--color-cream-300)',
         },
       },
       fontFamily: {
