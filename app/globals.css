@@ -4,16 +4,54 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Design tokens: dark theme (default) ─────────────── */
 :root {
   --gold: #c9a84c;
-  --navy-900: #0a0e1a;
+
+  --color-navy-950: #04070f;
+  --color-navy-900: #0a0e1a;
+  --color-navy-800: #0f1629;
+  --color-navy-700: #1a2744;
+  --color-navy-600: #1e2f5c;
+
+  --color-cream-100: #f9f6f0;
+  --color-cream-200: #f5f0e8;
+  --color-cream-300: #e8dcc8;
+
+  --scrollbar-track: #0f1629;
+  --scrollbar-thumb: #c9a84c40;
+  --scrollbar-thumb-hover: #c9a84c80;
+}
+
+/* ── Design tokens: light theme ──────────────────────── */
+html.light {
+  --color-navy-950: #ede7d9;
+  --color-navy-900: #faf7f2;
+  --color-navy-800: #f5efe3;
+  --color-navy-700: #ebe0cc;
+  --color-navy-600: #d8c9a8;
+
+  --color-cream-100: #1c1408;
+  --color-cream-200: #2e1e0e;
+  --color-cream-300: #5c4020;
+
+  --scrollbar-track: #f5efe3;
+  --scrollbar-thumb: #c9a84c60;
+  --scrollbar-thumb-hover: #c9a84c99;
 }
 
 html { scroll-behavior: smooth; }
 
+/* Theme transition — smooth but fast enough to feel snappy */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
+}
+/* Don't animate things that shouldn't transition */
+canvas, svg, img, video { transition: none !important; }
+
 body {
-  background-color: #0a0e1a;
-  color: #f5f0e8;
+  background-color: var(--color-navy-900);
+  color: var(--color-cream-200);
   font-family: 'Lato', sans-serif;
 }
 
@@ -56,9 +94,9 @@ body {
 
 /* ── Scrollbar ───────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #0f1629; }
-::-webkit-scrollbar-thumb { background: #c9a84c40; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #c9a84c80; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ── Disable text selection on reader canvas ─────────── */
 canvas { -webkit-user-select: none; user-select: none; }
@@ -69,6 +107,9 @@ input[type="range"] { accent-color: #c9a84c; cursor: pointer; }
 /* ── Form inputs ─────────────────────────────────────── */
 .input-field {
   @apply w-full bg-navy-800 border border-gold/20 text-cream-200 rounded px-4 py-3
-         focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold/30 transition-all
-         placeholder:text-cream-300/30;
+         focus:border-gold focus:outline-none focus:ring-1 focus:ring-gold/30 transition-all;
+}
+.input-field::placeholder {
+  color: var(--color-cream-300);
+  opacity: 0.3;
 }
