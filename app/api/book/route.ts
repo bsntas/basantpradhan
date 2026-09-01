@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(fileBuffer, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Cache-Control': 'private, max-age=1800, immutable',
       'X-Preview-Only': purchased ? 'false' : '10',
       'Content-Disposition': 'inline',
       'X-Content-Type-Options': 'nosniff',

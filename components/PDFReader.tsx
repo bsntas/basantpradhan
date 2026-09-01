@@ -11,6 +11,9 @@ const PDFJS_CDN = '/pdfjs/pdf.min.js';
 const WORKER_CDN = '/pdfjs/pdf.worker.min.js';
 const PREVIEW_LIMIT = 10;
 
+// Module-level cache: survives React re-mounts within the same tab session.
+const pdfDataCache = new Map<string, ArrayBuffer>();
+
 interface PDFReaderProps {
   bookUrl: string;
   purchased: boolean;
@@ -69,9 +72,13 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     try {
       setLoading(true);
       setError('');
-      const resp = await fetch(bookUrl, { credentials: 'include' });
-      if (!resp.ok) throw new Error('Failed to load book');
-      const data = await resp.arrayBuffer();
+      let data = pdfDataCache.get(bookUrl);
+      if (!data) {
+        const resp = await fetch(bookUrl, { credentials: 'include' });
+        if (!resp.ok) throw new Error('Failed to load book');
+        data = await resp.arrayBuffer();
+        pdfDataCache.set(bookUrl, data);
+      }
       const doc = await window.pdfjsLib.getDocument({ data }).promise;
       setPdfDoc(doc);
       setTotalPages(doc.numPages);
