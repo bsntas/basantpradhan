@@ -54,11 +54,18 @@ app/
 components/
   BookCover.tsx    # 3-D book cover; crops right half of two-up PDF spread
   PDFReader.tsx    # canvas PDF reader with TOC sidebar, preview lock
-  VoiceControls.tsx
+  VoiceControls.tsx  # TTS readout; plays pre-recorded MP3 first, falls back to Web Speech API
   Navbar.tsx
+
+scripts/
+  generate-audio.py  # generates public/audio/page-{N}.mp3 via edge-tts (run locally)
+
+public/
+  audio/           # pre-recorded per-page Nepali MP3s (commit after generation)
+  pdfjs/           # self-hosted PDF.js worker
 ```
 
-## Configuration: prices, VIP access, book ID
+## Configuration: prices, VIP access, book ID, version
 
 All in `lib/config.ts`:
 
@@ -68,6 +75,7 @@ export const PRICES = {
   GBP: { amount: 9.99, display: '£9.99' },
 };
 export const BOOK_ID = 'koltey-golai';
+export const BOOK_VERSION = '1';  // bump when replacing the PDF to bust browser cache
 const VIP_EMAILS_RAW = [
   'basantanickal@gmail.com',
   'basantsai26@gmail.com',
@@ -108,9 +116,33 @@ Copy `.env.example` to `.env.local` for local dev:
 
 ## PDF assets
 
-- Book PDF: served from `/api/book` (authenticated, purchase-gated)
+- Book PDF: served from `/api/book?v={BOOK_VERSION}` (authenticated, purchase-gated)
 - Cover PDF: served from `/api/cover` (public)
 - The cover is a two-up landscape spread; `BookCover.tsx` crops the right half
+- PDF is cached `private, max-age=31536000, immutable` in the browser (1 year); bump `BOOK_VERSION` in `lib/config.ts` to invalidate
+
+## Voice / audio readout
+
+`VoiceControls` reads the current page aloud in two modes, tried in order:
+
+1. **Pre-recorded MP3** — if `public/audio/page-{N}.mp3` exists (detected via HEAD request), it plays via HTML5 Audio. Voice/rate controls are hidden; a "★ Recorded" badge shows instead.
+2. **Web Speech API fallback** — if no MP3 is available, browser TTS is used with `lang=ne-NP` and a Chrome keep-alive fix (pause+resume every 14 s to work around Chrome's 15-second TTS cutout bug). Only Devanagari-capable voices are offered.
+
+### Generating pre-recorded audio
+
+Run **locally** (the production container blocks `speech.platform.bing.com`):
+
+```bash
+pip install edge-tts
+python scripts/generate-audio.py                        # female voice (HemkalaNeural), all pages
+python scripts/generate-audio.py --voice male           # SagarNeural
+python scripts/generate-audio.py --pages 7,13,15        # specific pages
+python scripts/generate-audio.py --rate -10%            # slower speech
+python scripts/generate-audio.py --overwrite            # regenerate existing files
+```
+
+Output: `public/audio/page-{N}.mp3` (~40–80 KB each, ~8–12 MB total).
+Commit `public/audio/` and deploy — Vercel serves the files as static assets.
 
 ## Auth flow
 
