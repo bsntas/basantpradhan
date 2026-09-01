@@ -60,20 +60,16 @@ body {
 }
 
 /* ── Page fold animations ────────────────────────────── */
-/* Old page folds away revealing the new page underneath — no in-animation. */
-/* Forward: left edge is the spine; right side folds away */
-@keyframes foldOutForward {
-  from { transform: rotateY(0deg);   }
-  to   { transform: rotateY(-90deg); }
-}
-/* Backward: right edge is the spine; left side folds away */
-@keyframes foldOutBackward {
-  from { transform: rotateY(0deg);  }
-  to   { transform: rotateY(90deg); }
-}
+/* Phase 1 — old page folds away (out). Phase 2 — new page folds in. */
+@keyframes foldOutForward  { from { transform: rotateY(0deg);    } to { transform: rotateY(-90deg); } }
+@keyframes foldOutBackward { from { transform: rotateY(0deg);    } to { transform: rotateY(90deg);  } }
+@keyframes foldInForward   { from { transform: rotateY(-90deg);  } to { transform: rotateY(0deg);   } }
+@keyframes foldInBackward  { from { transform: rotateY(90deg);   } to { transform: rotateY(0deg);   } }
 
-.animate-flip-out-forward  { transform-origin: left center;  animation: foldOutForward  0.25s ease-in forwards; backface-visibility: hidden; }
-.animate-flip-out-backward { transform-origin: right center; animation: foldOutBackward 0.25s ease-in forwards; backface-visibility: hidden; }
+.animate-flip-out-forward  { transform-origin: left center;  animation: foldOutForward  0.22s ease-in  forwards; backface-visibility: hidden; }
+.animate-flip-out-backward { transform-origin: right center; animation: foldOutBackward 0.22s ease-in  forwards; backface-visibility: hidden; }
+.animate-flip-in-forward   { transform-origin: left center;  animation: foldInForward   0.18s ease-out forwards; backface-visibility: hidden; }
+.animate-flip-in-backward  { transform-origin: right center; animation: foldInBackward  0.18s ease-out forwards; backface-visibility: hidden; }
 
 /* ── Shimmer text effect ─────────────────────────────── */
 .shimmer-text {

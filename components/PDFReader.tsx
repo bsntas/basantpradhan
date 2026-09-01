@@ -41,7 +41,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isFlipping, setIsFlipping] = useState(false);
+  const [flipState, setFlipState] = useState<null | 'out' | 'in'>(null);
   const [flipDir, setFlipDir] = useState<'forward' | 'backward'>('forward');
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [tocOpen, setTocOpen] = useState(false);
@@ -178,31 +178,37 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
     isFlippingRef.current = true;
 
-    // Pre-render new page to bottom canvas before animation starts so it's
-    // ready underneath the fold — avoids mid-animation flash of old content.
+    // Pre-render new page to bottom canvas (visible during fold-out).
     await renderToCanvas(newPage, bottomCanvasRef.current);
 
     setFlipDir(dir);
-    setIsFlipping(true);
+    setFlipState('out'); // Phase 1: old page folds away (0° → -90°)
 
-    // Use animationend (not setTimeout) for exact timing: the canvas is at exactly
-    // -90° when this fires, so it is edge-on and invisible. We render new content
-    // to the top canvas while it is invisible, then remove the animation class so
-    // the canvas snaps to 0° already showing the correct page — no flicker.
     const topCanvas = topCanvasRef.current;
-    const onAnimEnd = async () => {
-      topCanvas.removeEventListener('animationend', onAnimEnd);
-      if (!topCanvasRef.current) return; // guard against unmount
+
+    // Phase 1 complete: canvas is at -90° (edge-on, invisible).
+    // Render new content while invisible, then start fold-in.
+    const onFoldOut = async () => {
+      topCanvas.removeEventListener('animationend', onFoldOut);
+      if (!topCanvasRef.current) return;
+
       const size = await renderToCanvas(newPage, topCanvas);
       if (size) setCanvasSize(size);
-      // Tell renderPage (called by the currentPage useEffect) to skip its
-      // redundant re-render — canvas already has the correct content.
-      skipNextRenderRef.current = true;
-      setCurrentPage(newPage);
-      setIsFlipping(false);
-      isFlippingRef.current = false;
+
+      setFlipState('in'); // Phase 2: new page folds in (-90° → 0°)
+
+      // Phase 2 complete: new page is fully visible, clean up.
+      const onFoldIn = () => {
+        topCanvas.removeEventListener('animationend', onFoldIn);
+        // Skip the useEffect re-render — canvas already has the correct content.
+        skipNextRenderRef.current = true;
+        setCurrentPage(newPage);
+        setFlipState(null);
+        isFlippingRef.current = false;
+      };
+      topCanvas.addEventListener('animationend', onFoldIn);
     };
-    topCanvas.addEventListener('animationend', onAnimEnd);
+    topCanvas.addEventListener('animationend', onFoldOut);
   }, [maxPage, renderToCanvas, viewMode]);
 
   useEffect(() => {
@@ -226,8 +232,10 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
   const topCanvasClass = [
     'block rounded-sm absolute top-0 left-0 z-10',
-    isFlipping
+    flipState === 'out'
       ? (flipDir === 'forward' ? 'animate-flip-out-forward' : 'animate-flip-out-backward')
+      : flipState === 'in'
+      ? (flipDir === 'forward' ? 'animate-flip-in-forward' : 'animate-flip-in-backward')
       : '',
   ].join(' ');
 
@@ -427,7 +435,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
             style={{
               userSelect: 'none',
               WebkitUserSelect: 'none',
-              visibility: isFlipping ? 'visible' : 'hidden',
+              visibility: flipState !== null ? 'visible' : 'hidden',
             }}
           />
           {/* Top canvas: current page, animates out on navigation */}
