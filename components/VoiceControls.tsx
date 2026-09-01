@@ -25,6 +25,31 @@ const MALE_HINTS = [
   'jorge','luca','damien','aaron','albert','bruce','carlos','cepstral','james',
 ];
 
+// Matches voices that can pronounce Devanagari (Nepali / Hindi)
+const DEVANAGARI_LANG_CODES = ['ne', 'ne-np', 'ne-in', 'hi', 'hi-in'];
+function isDevanagariVoice(voice: SpeechSynthesisVoice): boolean {
+  const lang = voice.lang.toLowerCase();
+  return DEVANAGARI_LANG_CODES.some(code => lang.startsWith(code));
+}
+
+// True when the string contains Devanagari Unicode characters
+function hasDevanagari(s: string): boolean {
+  return /[ऀ-ॿ]/.test(s);
+}
+
+// Strip content that TTS reads poorly: URLs, phone numbers, ISBNs, special symbols
+function cleanForSpeech(s: string): string {
+  return s
+    .replace(/https?:\/\/\S+/gi, '')           // URLs
+    .replace(/www\.\S+/gi, '')                  // www links
+    .replace(/\S+@\S+\.\S+/g, '')              // email addresses
+    .replace(/[+]?\d[\d\s\-]{7,}/g, '')        // phone numbers
+    .replace(/ISBN\s*:?\s*[\d\-]+/gi, '')       // ISBNs
+    .replace(/[|।॥]/g, ' ')                    // Devanagari danda / double danda
+    .replace(/[^\S\n]+/g, ' ')                  // collapse whitespace
+    .trim();
+}
+
 function guessGender(voice: SpeechSynthesisVoice): Gender | null {
   const n = voice.name.toLowerCase();
   if (FEMALE_HINTS.some(h => n.includes(h))) return 'female';
@@ -90,9 +115,27 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
   const speak = () => {
     if (!text) return;
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voice = voices.find(v => v.name === selectedVoice) ?? voices[0];
-    if (voice) utterance.voice = voice;
+
+    const isNepali = hasDevanagari(text);
+    const spokenText = isNepali ? cleanForSpeech(text) : text;
+    if (!spokenText.trim()) return;
+
+    const utterance = new SpeechSynthesisUtterance(spokenText);
+
+    if (isNepali) {
+      utterance.lang = 'ne-NP';
+      // Prefer a Devanagari-capable voice; fall back to the user-selected or first voice
+      const devanagariVoice =
+        voices.find(v => isDevanagariVoice(v) && guessGender(v) === gender) ??
+        voices.find(v => isDevanagariVoice(v)) ??
+        voices.find(v => v.name === selectedVoice) ??
+        voices[0];
+      if (devanagariVoice) utterance.voice = devanagariVoice;
+    } else {
+      const voice = voices.find(v => v.name === selectedVoice) ?? voices[0];
+      if (voice) utterance.voice = voice;
+    }
+
     utterance.rate   = rate;
     utterance.pitch  = pitch;
     utterance.volume = volume;
