@@ -57,6 +57,14 @@ function guessGender(voice: SpeechSynthesisVoice): Gender | null {
   return null;
 }
 
+// Higher = better quality voice (less robotic)
+function voiceQuality(voice: SpeechSynthesisVoice): number {
+  const n = voice.name.toLowerCase();
+  if (n.includes('premium') || n.includes('enhanced') || n.includes('neural')) return 3;
+  if (n.includes('google') || n.includes('microsoft') || n.includes('apple')) return 2;
+  return 1;
+}
+
 export default function VoiceControls({ text }: VoiceControlsProps) {
   const [voices, setVoices]               = useState<SpeechSynthesisVoice[]>([]);
   const [selectedVoice, setSelectedVoice] = useState('');
@@ -70,6 +78,14 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
   const [isOpen, setIsOpen]               = useState(false);
   const [showAdvanced, setShowAdvanced]   = useState(false);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const clearKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) {
+      clearInterval(keepAliveRef.current);
+      keepAliveRef.current = null;
+    }
+  }, []);
 
   const loadVoices = useCallback(() => {
     const v = window.speechSynthesis.getVoices();
@@ -105,12 +121,22 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
     setPitch(p);
   }, [texture]);
 
+  // Auto-select best Devanagari voice when arriving on a Nepali page
+  useEffect(() => {
+    if (!hasDevanagari(text) || !voices.length) return;
+    const best = voices
+      .filter(v => isDevanagariVoice(v))
+      .sort((a, b) => voiceQuality(b) - voiceQuality(a))[0];
+    if (best) setSelectedVoice(best.name);
+  }, [text, voices]);
+
   // Stop on page turn
   useEffect(() => {
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
-  }, [text]);
+    clearKeepAlive();
+  }, [text, clearKeepAlive]);
 
   const speak = () => {
     if (!text) return;
@@ -124,10 +150,10 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
 
     if (isNepali) {
       utterance.lang = 'ne-NP';
-      // Prefer a Devanagari-capable voice; fall back to the user-selected or first voice
+      // Respect user's explicit pick if it's a Devanagari voice; otherwise best quality match
       const devanagariVoice =
-        voices.find(v => isDevanagariVoice(v) && guessGender(v) === gender) ??
-        voices.find(v => isDevanagariVoice(v)) ??
+        voices.find(v => v.name === selectedVoice && isDevanagariVoice(v)) ??
+        voices.filter(v => isDevanagariVoice(v)).sort((a, b) => voiceQuality(b) - voiceQuality(a))[0] ??
         voices.find(v => v.name === selectedVoice) ??
         voices[0];
       if (devanagariVoice) utterance.voice = devanagariVoice;
@@ -139,9 +165,20 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
     utterance.rate   = rate;
     utterance.pitch  = pitch;
     utterance.volume = volume;
-    utterance.onstart  = () => { setIsPlaying(true);  setIsPaused(false); };
-    utterance.onend    = () => { setIsPlaying(false); setIsPaused(false); };
-    utterance.onerror  = () => { setIsPlaying(false); setIsPaused(false); };
+    utterance.onstart  = () => {
+      setIsPlaying(true);
+      setIsPaused(false);
+      clearKeepAlive();
+      // Chrome silently stops speech after ~15 s; pause+resume every 14 s to keep it alive
+      keepAliveRef.current = setInterval(() => {
+        if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 14000);
+    };
+    utterance.onend    = () => { setIsPlaying(false); setIsPaused(false); clearKeepAlive(); };
+    utterance.onerror  = () => { setIsPlaying(false); setIsPaused(false); clearKeepAlive(); };
     utterance.onpause  = () => setIsPaused(true);
     utterance.onresume = () => setIsPaused(false);
     utteranceRef.current = utterance;
@@ -157,12 +194,17 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setIsPaused(false);
+    clearKeepAlive();
   };
 
-  const filteredVoices = voices.filter(v => {
-    const g = guessGender(v);
-    return g === gender || g === null;
-  });
+  const isDevanagariPage = hasDevanagari(text);
+  const filteredVoices = voices
+    .filter(v => {
+      if (isDevanagariPage) return isDevanagariVoice(v);
+      const g = guessGender(v);
+      return g === gender || g === null;
+    })
+    .sort((a, b) => voiceQuality(b) - voiceQuality(a));
 
   return (
     <div className="fixed bottom-6 right-6 z-40">
@@ -237,20 +279,52 @@ export default function VoiceControls({ text }: VoiceControlsProps) {
             </div>
           </div>
 
-          {/* Voice picker (filtered to gender) */}
-          {filteredVoices.length > 1 && (
+          {/* Voice picker */}
+          {isDevanagariPage ? (
             <div className="mb-4">
-              <label className="text-cream-300 text-xs uppercase tracking-wider block mb-1">Voice</label>
-              <select
-                value={selectedVoice}
-                onChange={e => setSelectedVoice(e.target.value)}
-                className="w-full bg-navy-900 border border-gold/20 text-cream-200 rounded px-3 py-2 text-sm focus:border-gold outline-none"
-              >
-                {filteredVoices.map(v => (
-                  <option key={v.name} value={v.name}>{v.name}</option>
-                ))}
-              </select>
+              <label className="text-cream-300 text-xs uppercase tracking-wider flex justify-between mb-1">
+                <span>Voice — Devanagari</span>
+                {filteredVoices.length > 0 && (
+                  <span className="text-gold/50 normal-case font-normal">★ = premium</span>
+                )}
+              </label>
+              {filteredVoices.length > 0 ? (
+                <select
+                  value={selectedVoice}
+                  onChange={e => setSelectedVoice(e.target.value)}
+                  className="w-full bg-navy-900 border border-gold/20 text-cream-200 rounded px-3 py-2 text-sm focus:border-gold outline-none"
+                >
+                  {filteredVoices.map(v => (
+                    <option key={v.name} value={v.name}>
+                      {voiceQuality(v) === 3 ? '★ ' : ''}{v.name}
+                      {' '}({v.lang}){' '}
+                      {guessGender(v) === 'female' ? '♀' : guessGender(v) === 'male' ? '♂' : ''}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <p className="text-xs text-gold/60 bg-gold/10 rounded px-2 py-1.5 border border-gold/15 leading-relaxed">
+                  No Hindi/Nepali voice installed. Add a Hindi (hi‑IN) voice in your OS settings for best results.
+                </p>
+              )}
             </div>
+          ) : (
+            filteredVoices.length > 1 && (
+              <div className="mb-4">
+                <label className="text-cream-300 text-xs uppercase tracking-wider block mb-1">Voice</label>
+                <select
+                  value={selectedVoice}
+                  onChange={e => setSelectedVoice(e.target.value)}
+                  className="w-full bg-navy-900 border border-gold/20 text-cream-200 rounded px-3 py-2 text-sm focus:border-gold outline-none"
+                >
+                  {filteredVoices.map(v => (
+                    <option key={v.name} value={v.name}>
+                      {voiceQuality(v) === 3 ? '★ ' : ''}{v.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )
           )}
 
           {/* Volume */}
