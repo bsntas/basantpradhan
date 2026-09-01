@@ -177,15 +177,21 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     // Pre-render target page to bottom canvas so it's visible under the fold
     renderToCanvas(newPage, bottomCanvasRef.current);
 
-    // After fold completes, re-render top canvas while it's at -90° (invisible)
+    // After fold completes, re-render top canvas while it's still at -90° (invisible due to rotation).
+    // Then hide it before removing the animation class so the instantaneous snap from -90° → 0° is
+    // never visible, and reveal it one frame later once the DOM has settled.
     setTimeout(async () => {
       if (topCanvasRef.current) {
         const size = await renderToCanvas(newPage, topCanvasRef.current);
         if (size) setCanvasSize(size);
+        topCanvasRef.current.style.opacity = '0';
       }
       setCurrentPage(newPage);
       setIsFlipping(false);
       isFlippingRef.current = false;
+      requestAnimationFrame(() => {
+        if (topCanvasRef.current) topCanvasRef.current.style.opacity = '1';
+      });
     }, 250);
   }, [maxPage, renderToCanvas, viewMode]);
 
