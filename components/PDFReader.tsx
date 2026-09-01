@@ -35,6 +35,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const touchStartY = useRef(0);
   const isFlippingRef = useRef(false);
   const skipNextRenderRef = useRef(false);
+  const currentPageRef = useRef(1);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -142,20 +143,27 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     if (size) setCanvasSize(size);
   }, [renderToCanvas]);
 
+  // Keep ref in sync so ResizeObserver always reads the latest page without
+  // being listed as a dependency (which would restart it on every page turn).
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+
   // Use rAF so layout is complete before measuring the container
   useEffect(() => {
     const raf = requestAnimationFrame(() => renderPage(currentPage));
     return () => cancelAnimationFrame(raf);
   }, [currentPage, renderPage]);
 
-  // ResizeObserver re-renders on container resize
+  // ResizeObserver re-renders on container resize.
+  // Intentionally omits currentPage from deps — the observer must NOT restart
+  // on every page turn, because browsers fire the callback once on first
+  // observation, which would consume the flip skip-guard and cause a flicker.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
-    const observer = new ResizeObserver(() => renderPage(currentPage));
+    const observer = new ResizeObserver(() => renderPage(currentPageRef.current));
     observer.observe(container);
     return () => observer.disconnect();
-  }, [currentPage, renderPage]);
+  }, [renderPage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset text scroll to top on page change in text mode
   useEffect(() => {
