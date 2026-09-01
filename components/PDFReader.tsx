@@ -158,7 +158,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     }
   }, [currentPage, viewMode]);
 
-  const goToPage = useCallback((newPage: number, dir: 'forward' | 'backward') => {
+  const goToPage = useCallback(async (newPage: number, dir: 'forward' | 'backward') => {
     if (newPage < 1 || newPage > maxPage) return;
 
     // Text mode: instant navigation, no canvas animation
@@ -171,15 +171,17 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     if (!bottomCanvasRef.current || !topCanvasRef.current) return;
 
     isFlippingRef.current = true;
+
+    // Await bottom canvas before starting animation — if we kick off the animation
+    // and the render finishes mid-fold the new content flashes into view underneath.
+    await renderToCanvas(newPage, bottomCanvasRef.current);
+
     setFlipDir(dir);
     setIsFlipping(true);
 
-    // Pre-render target page to bottom canvas so it's visible under the fold
-    renderToCanvas(newPage, bottomCanvasRef.current);
-
-    // After fold completes, re-render top canvas while it's still at -90° (invisible due to rotation).
-    // Then hide it before removing the animation class so the instantaneous snap from -90° → 0° is
-    // never visible, and reveal it one frame later once the DOM has settled.
+    // After fold completes, swap top canvas content while it is at -90° (hidden by rotation),
+    // then hide it before removing the animation class so the snap from -90° → 0° is invisible,
+    // and reveal it one frame later once the DOM has settled.
     setTimeout(async () => {
       if (topCanvasRef.current) {
         const size = await renderToCanvas(newPage, topCanvasRef.current);
