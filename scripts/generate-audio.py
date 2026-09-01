@@ -24,16 +24,26 @@ Commit the public/audio/ directory so Vercel serves the files as static assets.
 
 import asyncio
 import re
+import ssl
 import sys
 import os
 import argparse
 
 try:
     import edge_tts
+    import aiohttp
 except ImportError:
     print("edge-tts is not installed. Run:")
     print("  pip install edge-tts")
     sys.exit(1)
+
+# Build an SSL context that trusts the proxy's CA bundle when present.
+_CA_BUNDLE = os.environ.get("SSL_CERT_FILE") or os.environ.get("REQUESTS_CA_BUNDLE")
+def _make_connector() -> aiohttp.TCPConnector:
+    ctx = ssl.create_default_context()
+    if _CA_BUNDLE and os.path.exists(_CA_BUNDLE):
+        ctx.load_verify_locations(_CA_BUNDLE)
+    return aiohttp.TCPConnector(ssl=ctx)
 
 VOICES = {
     "female": "ne-NP-HemkalaNeural",
@@ -96,7 +106,7 @@ async def generate_page(
         return False
 
     try:
-        communicate = edge_tts.Communicate(cleaned, voice, rate=rate)
+        communicate = edge_tts.Communicate(cleaned, voice, rate=rate, connector=_make_connector())
         await communicate.save(out_path)
         size_kb = os.path.getsize(out_path) / 1024
         print(f"  page {page:4d}: ✓  {size_kb:5.0f} KB  →  {os.path.basename(out_path)}")
@@ -138,7 +148,7 @@ async def main() -> None:
     args = parser.parse_args()
 
     if args.list_voices:
-        all_voices = await edge_tts.list_voices()
+        all_voices = await edge_tts.list_voices(connector=_make_connector())
         nepali = [v for v in all_voices if v["Locale"].lower().startswith("ne")]
         if nepali:
             print("Available Nepali voices:")
