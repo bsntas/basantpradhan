@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { BOOK_VERSION } from '@/lib/config';
 
 const PDFReader = dynamic(() => import('@/components/PDFReader'), { ssr: false });
 
@@ -78,7 +79,7 @@ export default function ReaderPage() {
       {/* Reader fills all remaining space — no padding so PDFReader owns its layout */}
       <main className="flex-1 min-h-0 overflow-hidden relative">
         <PDFReader
-          bookUrl="/api/book"
+          bookUrl={`/api/book?v=${BOOK_VERSION}`}
           purchased={purchased}
           previewLimit={10}
         />
