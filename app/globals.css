@@ -72,8 +72,8 @@ body {
   to   { transform: rotateY(90deg); }
 }
 
-.animate-flip-out-forward  { transform-origin: left center;  animation: foldOutForward  0.25s ease-in forwards; }
-.animate-flip-out-backward { transform-origin: right center; animation: foldOutBackward 0.25s ease-in forwards; }
+.animate-flip-out-forward  { transform-origin: left center;  animation: foldOutForward  0.25s ease-in forwards; backface-visibility: hidden; }
+.animate-flip-out-backward { transform-origin: right center; animation: foldOutBackward 0.25s ease-in forwards; backface-visibility: hidden; }
 
 /* ── Shimmer text effect ─────────────────────────────── */
 .shimmer-text {

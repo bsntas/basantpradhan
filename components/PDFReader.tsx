@@ -34,6 +34,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
   const isFlippingRef = useRef(false);
+  const skipNextRenderRef = useRef(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -131,6 +132,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   }, [pdfDoc]);
 
   const renderPage = useCallback(async (pageNum: number) => {
+    // Skip if goToPage already rendered to topCanvas during flip — avoid double-render flash
+    if (skipNextRenderRef.current) {
+      skipNextRenderRef.current = false;
+      return;
+    }
     if (!topCanvasRef.current) return;
     const size = await renderToCanvas(pageNum, topCanvasRef.current);
     if (size) setCanvasSize(size);
@@ -172,29 +178,31 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
     isFlippingRef.current = true;
 
-    // Await bottom canvas before starting animation — if we kick off the animation
-    // and the render finishes mid-fold the new content flashes into view underneath.
+    // Pre-render new page to bottom canvas before animation starts so it's
+    // ready underneath the fold — avoids mid-animation flash of old content.
     await renderToCanvas(newPage, bottomCanvasRef.current);
 
     setFlipDir(dir);
     setIsFlipping(true);
 
-    // After fold completes, swap top canvas content while it is at -90° (hidden by rotation),
-    // then hide it before removing the animation class so the snap from -90° → 0° is invisible,
-    // and reveal it one frame later once the DOM has settled.
-    setTimeout(async () => {
-      if (topCanvasRef.current) {
-        const size = await renderToCanvas(newPage, topCanvasRef.current);
-        if (size) setCanvasSize(size);
-        topCanvasRef.current.style.opacity = '0';
-      }
+    // Use animationend (not setTimeout) for exact timing: the canvas is at exactly
+    // -90° when this fires, so it is edge-on and invisible. We render new content
+    // to the top canvas while it is invisible, then remove the animation class so
+    // the canvas snaps to 0° already showing the correct page — no flicker.
+    const topCanvas = topCanvasRef.current;
+    const onAnimEnd = async () => {
+      topCanvas.removeEventListener('animationend', onAnimEnd);
+      if (!topCanvasRef.current) return; // guard against unmount
+      const size = await renderToCanvas(newPage, topCanvas);
+      if (size) setCanvasSize(size);
+      // Tell renderPage (called by the currentPage useEffect) to skip its
+      // redundant re-render — canvas already has the correct content.
+      skipNextRenderRef.current = true;
       setCurrentPage(newPage);
       setIsFlipping(false);
       isFlippingRef.current = false;
-      requestAnimationFrame(() => {
-        if (topCanvasRef.current) topCanvasRef.current.style.opacity = '1';
-      });
-    }, 250);
+    };
+    topCanvas.addEventListener('animationend', onAnimEnd);
   }, [maxPage, renderToCanvas, viewMode]);
 
   useEffect(() => {
