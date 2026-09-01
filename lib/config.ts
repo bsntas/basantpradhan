@@ -11,6 +11,11 @@ export const DEFAULT_CURRENCY: CurrencyCode = 'INR';
 // ── Book identifier ──────────────────────────────────────────
 export const BOOK_ID = 'koltey-golai';
 
+// ── Book asset version ───────────────────────────────────────
+// Bump this string whenever you replace the PDF so browsers
+// discard their 1-year cached copy and fetch the new file.
+export const BOOK_VERSION = '1';
+
 // ── VIP / complimentary access ───────────────────────────────
 // Emails listed here get full access automatically when logged in —
 // no purchase required. Add more emails as needed.
