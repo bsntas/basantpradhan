@@ -41,7 +41,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [flipState, setFlipState] = useState<null | 'out' | 'in'>(null);
+  const [flipState, setFlipState] = useState<null | 'out'>(null);
   const [flipDir, setFlipDir] = useState<'forward' | 'backward'>('forward');
   const [canvasSize, setCanvasSize] = useState({ w: 0, h: 0 });
   const [tocOpen, setTocOpen] = useState(false);
@@ -186,8 +186,9 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
 
     const topCanvas = topCanvasRef.current;
 
-    // Phase 1 complete: canvas is at -90° (edge-on, invisible).
-    // Render new content while invisible, then start fold-in.
+    // Fold-out complete: canvas is at -90° (edge-on, invisible).
+    // Render new content while invisible, then snap to 0° — bottom canvas
+    // was already showing the new page so there is no visible gap.
     const onFoldOut = async () => {
       topCanvas.removeEventListener('animationend', onFoldOut);
       if (!topCanvasRef.current) return;
@@ -195,18 +196,11 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       const size = await renderToCanvas(newPage, topCanvas);
       if (size) setCanvasSize(size);
 
-      setFlipState('in'); // Phase 2: new page folds in (-90° → 0°)
-
-      // Phase 2 complete: new page is fully visible, clean up.
-      const onFoldIn = () => {
-        topCanvas.removeEventListener('animationend', onFoldIn);
-        // Skip the useEffect re-render — canvas already has the correct content.
-        skipNextRenderRef.current = true;
-        setCurrentPage(newPage);
-        setFlipState(null);
-        isFlippingRef.current = false;
-      };
-      topCanvas.addEventListener('animationend', onFoldIn);
+      // Skip the useEffect re-render — canvas already has the correct content.
+      skipNextRenderRef.current = true;
+      setCurrentPage(newPage);
+      setFlipState(null); // removes animation class; top canvas snaps to 0° with new content
+      isFlippingRef.current = false;
     };
     topCanvas.addEventListener('animationend', onFoldOut);
   }, [maxPage, renderToCanvas, viewMode]);
@@ -234,8 +228,6 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
     'block rounded-sm absolute top-0 left-0 z-10',
     flipState === 'out'
       ? (flipDir === 'forward' ? 'animate-flip-out-forward' : 'animate-flip-out-backward')
-      : flipState === 'in'
-      ? (flipDir === 'forward' ? 'animate-flip-in-forward' : 'animate-flip-in-backward')
       : '',
   ].join(' ');
 
