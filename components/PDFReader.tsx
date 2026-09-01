@@ -100,7 +100,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       if (cW === 0 || cH === 0) return null;
 
       const natural = page.getViewport({ scale: 1 });
-      const isSpread = natural.width > natural.height * 1.4;
+      const isSpread = natural.width > natural.height * 1.15;
       const effectiveW = isSpread ? natural.width / 2 : natural.width;
 
       const scaleW = (cW - 48) / effectiveW;
@@ -460,7 +460,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
               {bodyText ? (
                 <p
                   className="text-cream-200 text-[15.5px] leading-[2.2] text-justify flex-1 select-text"
-                  style={{ fontFamily: "'Noto Serif Devanagari', 'Noto Serif', serif" }}
+                  style={{ fontFamily: "'Noto Serif Devanagari', 'Noto Serif', serif", whiteSpace: 'pre-line' }}
                 >
                   {bodyText}
                 </p>
