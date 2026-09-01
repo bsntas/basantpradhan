@@ -558,10 +558,8 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         </p>
       </div>
 
-      {/* ── Voice controls — text mode only ─────────────────────── */}
-      {viewMode === 'text' && (
-        <VoiceControls text={BOOK_TEXT[currentPage] ?? ''} />
-      )}
+      {/* ── Voice controls — always visible; reads bookText in PDF mode too ── */}
+      <VoiceControls text={BOOK_TEXT[currentPage] ?? ''} />
     </div>
   );
 }
