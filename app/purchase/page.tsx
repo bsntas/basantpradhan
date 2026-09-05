@@ -43,11 +43,14 @@ export default function PurchasePage() {
   };
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => {
-      if (d.user) setUser(d.user);
-      else router.push('/login?redirect=/purchase');
-      setCheckingAuth(false);
-    });
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => {
+        if (d.user) setUser(d.user);
+        else router.push('/login?redirect=/purchase');
+        setCheckingAuth(false);
+      })
+      .catch(() => router.push('/login?redirect=/purchase'));
   }, [router]);
 
   const handleINRPayment = async () => {

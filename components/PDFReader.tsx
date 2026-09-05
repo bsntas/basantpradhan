@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { TABLE_OF_CONTENTS, type TocEntry } from '@/lib/toc';
 import { BOOK_TEXT } from '@/lib/bookText';
+import { PRICES } from '@/lib/config';
 
 const VoiceControls = dynamic(() => import('@/components/VoiceControls'), { ssr: false });
 
@@ -514,7 +515,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
         )}
 
         {/* Preview gate overlay */}
-        {!purchased && currentPage >= maxPage && (
+        {!purchased && currentPage > maxPage && (
           <div className="absolute inset-0 bg-navy-900/92 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
             <svg className="w-14 h-14 text-gold/55" fill="currentColor" viewBox="0 0 24 24">
               <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
@@ -525,7 +526,7 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
               नि:शुल्क पूर्वावलोकन समाप्त भयो। पूरा पुस्तक पढ्न किन्नुहोस्।
             </p>
             <a href="/purchase" className="mt-2 px-6 py-3 bg-gold text-navy-900 rounded font-semibold hover:bg-gold-light transition-colors">
-              पूरा पुस्तक किन्नुहोस् — £9.99
+              पूरा पुस्तक किन्नुहोस् — {Object.values(PRICES).map(p => p.display).join(' / ')}
             </a>
           </div>
         )}

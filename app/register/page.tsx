@@ -11,6 +11,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,8 +32,8 @@ export default function RegisterPage() {
 
     if (!res.ok) { setError(data.error ?? 'Registration failed'); return; }
 
-    router.push('/');
-    router.refresh();
+    setSuccess(true);
+    setTimeout(() => { router.push('/'); router.refresh(); }, 1500);
   };
 
   return (
@@ -50,6 +51,12 @@ export default function RegisterPage() {
           <p className="text-cream-300/50 text-xs mb-1">Create Account</p>
           <p className="text-cream-300/60 text-sm"><em>कोल्टे गोलाई</em> पढ्न सामेल हुनुहोस्</p>
         </div>
+
+        {success && (
+          <div className="mb-6 p-3 bg-green-900/30 border border-green-500/30 rounded text-green-300 text-sm text-center">
+            खाता बन्यो! स्वागत छ — Account created! Redirecting…
+          </div>
+        )}
 
         {error && (
           <div className="mb-6 p-3 bg-red-900/30 border border-red-500/30 rounded text-red-300 text-sm text-center">

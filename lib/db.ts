@@ -76,9 +76,12 @@ function writeFile(db: { users: User[] }): void {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const path = require('path') as typeof import('path');
   const file = path.join(process.cwd(), 'data', 'users.json');
+  const tmp = `${file}.${process.pid}.tmp`;
   try {
-    fs.writeFileSync(file, JSON.stringify(db, null, 2));
+    fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
+    fs.renameSync(tmp, file);
   } catch (err) {
+    try { fs.unlinkSync(tmp); } catch { /* ignore */ }
     // Vercel production filesystem is read-only — set REDIS_URL or KV_REST_API_URL
     console.error('[db] writeFile failed (read-only filesystem?). Set REDIS_URL in Vercel env vars.', err);
     throw new Error('Database unavailable: set REDIS_URL in Vercel environment variables');

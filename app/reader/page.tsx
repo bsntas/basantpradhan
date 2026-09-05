@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { BOOK_VERSION } from '@/lib/config';
+import { BOOK_VERSION, PRICES } from '@/lib/config';
 
 const PDFReader = dynamic(() => import('@/components/PDFReader'), { ssr: false });
 
@@ -20,11 +20,21 @@ export default function ReaderPage() {
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/auth/me').then(r => r.json()).then(d => {
-      if (!d.user) { router.push('/login?redirect=/reader'); return; }
-      setUser(d.user);
-      setAuthLoading(false);
-    });
+    fetch('/api/auth/me')
+      .then(r => r.json())
+      .then(d => {
+        if (!d.user) {
+          setAuthLoading(false);
+          router.push('/login?redirect=/reader');
+          return;
+        }
+        setUser(d.user);
+        setAuthLoading(false);
+      })
+      .catch(() => {
+        setAuthLoading(false);
+        router.push('/login?redirect=/reader');
+      });
   }, [router]);
 
   if (authLoading) {
@@ -95,7 +105,7 @@ export default function ReaderPage() {
             </p>
             <Link href="/purchase"
               className="shrink-0 px-5 py-2 bg-gold text-navy-900 font-bold text-sm uppercase tracking-wider hover:bg-gold-light transition-colors rounded-sm">
-              Buy — ₹51 / £9.99
+              Buy — {Object.values(PRICES).map(p => p.display).join(' / ')}
             </Link>
           </div>
         </div>
