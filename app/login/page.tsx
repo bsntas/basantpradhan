@@ -15,6 +15,7 @@ function LoginForm() {
 
   const oauthError = searchParams.get('error');
   const oauthReason = searchParams.get('reason');
+  const redirectTo = searchParams.get('redirect') ?? '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,7 +36,7 @@ function LoginForm() {
       return;
     }
 
-    router.push('/');
+    router.push(redirectTo);
     router.refresh();
   };
 

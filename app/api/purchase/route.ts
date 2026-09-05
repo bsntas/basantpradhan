@@ -3,6 +3,10 @@ import { getUserFromRequest } from '@/lib/auth';
 import { addPurchase, hasPurchased } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
+  if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_MOCK_PURCHASE) {
+    return NextResponse.json({ error: 'Not available' }, { status: 403 });
+  }
+
   const session = await getUserFromRequest(req);
   if (!session) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 

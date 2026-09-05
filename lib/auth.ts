@@ -2,9 +2,11 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET ?? 'basant-pradhan-koltey-golai-secret-key-2024'
-);
+function getSecret(): Uint8Array {
+  const s = process.env.JWT_SECRET;
+  if (!s) throw new Error('JWT_SECRET environment variable is not set');
+  return new TextEncoder().encode(s);
+}
 
 export const COOKIE_NAME = 'bp_auth';
 const MAX_AGE = 7 * 24 * 60 * 60; // 7 days in seconds
@@ -20,12 +22,12 @@ export async function createToken(payload: TokenPayload): Promise<string> {
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime('7d')
-    .sign(SECRET);
+    .sign(getSecret());
 }
 
 export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getSecret());
     return payload as unknown as TokenPayload;
   } catch {
     return null;
@@ -45,10 +47,12 @@ export async function getUserFromRequest(req: NextRequest): Promise<TokenPayload
   return verifyToken(token);
 }
 
+const SECURE = process.env.NODE_ENV === 'production' ? '; Secure' : '';
+
 export function authCookieHeader(token: string): string {
-  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax`;
+  return `${COOKIE_NAME}=${token}; HttpOnly; Path=/; Max-Age=${MAX_AGE}; SameSite=Lax${SECURE}`;
 }
 
 export function clearCookieHeader(): string {
-  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax`;
+  return `${COOKIE_NAME}=; HttpOnly; Path=/; Max-Age=0; SameSite=Lax${SECURE}`;
 }

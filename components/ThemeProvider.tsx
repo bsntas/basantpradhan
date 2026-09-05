@@ -72,5 +72,5 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const useTheme = () => useContext(PrefsContext);
 export const usePrefs = () => useContext(PrefsContext);
+export const useTheme = usePrefs;
