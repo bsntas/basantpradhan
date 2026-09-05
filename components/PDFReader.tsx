@@ -129,6 +129,8 @@ export default function PDFReader({ bookUrl, purchased, previewLimit = PREVIEW_L
       canvas.style.height = `${cssH}px`;
 
       const ctx = canvas.getContext('2d')!;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
       if (isSpread) {
         ctx.translate(-halfW, 0);
       }
