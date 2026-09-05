@@ -4,8 +4,13 @@ import { NextRequest } from 'next/server';
 
 function getSecret(): Uint8Array {
   const s = process.env.JWT_SECRET;
-  if (!s) throw new Error('JWT_SECRET environment variable is not set');
-  return new TextEncoder().encode(s);
+  if (!s) {
+    console.error(
+      '[auth] JWT_SECRET is not set. Using insecure fallback — ' +
+      'set JWT_SECRET in your Vercel environment variables immediately.',
+    );
+  }
+  return new TextEncoder().encode(s ?? 'basant-pradhan-koltey-golai-secret-key-2024');
 }
 
 export const COOKIE_NAME = 'bp_auth';
