@@ -107,12 +107,78 @@ Copy `.env.example` to `.env.local` for local dev:
 | `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` | Razorpay API keys |
 | `RAZORPAY_WEBHOOK_SECRET` | Matches the secret in Razorpay Dashboard → Webhooks |
 
-## Razorpay setup checklist
+## Vercel deployment
 
-1. Get test keys from razorpay.com → Settings → API Keys (`rzp_test_...`)
-2. Set `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` in `.env.local`
-3. For webhooks: set `RAZORPAY_WEBHOOK_SECRET` to any long random string; configure the same in Razorpay Dashboard pointing to `https://your-domain.com/api/webhooks/razorpay`, event `payment.captured`
-4. If env vars are absent the purchase page falls back to mock (grants access immediately)
+The site deploys automatically when you push to `main` (if connected to Vercel). All env vars below must be set in **Vercel Dashboard → Project → Settings → Environment Variables** for production.
+
+### Step 1 — Core env vars (required)
+
+| Variable | How to get it |
+|---|---|
+| `JWT_SECRET` | Run `openssl rand -base64 32` in your terminal |
+| `NEXT_PUBLIC_BASE_URL` | Your Vercel URL, e.g. `https://your-site.vercel.app` (no trailing slash) |
+
+### Step 2 — Vercel KV (user database)
+
+Option A — **Vercel KV** (recommended for production):
+1. In Vercel Dashboard → Storage → Create Database → KV
+2. Link it to your project → the `KV_REST_API_URL` and `KV_REST_API_TOKEN` env vars are added automatically
+
+Option B — **Local JSON file** (dev only):  
+Leave KV vars empty; `data/users.json` is created automatically on first login.
+
+### Step 3 — Razorpay (INR payments)
+
+**Get API keys:**
+1. Log in at [razorpay.com](https://razorpay.com) → Settings → API Keys
+2. Generate a key pair — use **Test Mode** keys (`rzp_test_...`) until you're ready to go live
+3. Set in Vercel and in `.env.local`:
+   ```
+   RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxx
+   RAZORPAY_KEY_SECRET=your_key_secret
+   ```
+
+**Set up the webhook (required for reliable payment confirmation):**
+1. Generate a webhook secret: `openssl rand -base64 32`
+2. Set it as `RAZORPAY_WEBHOOK_SECRET` in Vercel and in `.env.local`
+3. In Razorpay Dashboard → Settings → Webhooks → Add New Webhook:
+   - **URL**: `https://your-site.vercel.app/api/webhooks/razorpay`
+   - **Secret**: same value as `RAZORPAY_WEBHOOK_SECRET`
+   - **Events**: tick `payment.captured` only
+4. Click Save
+
+**How payments work end-to-end:**
+1. `/api/purchase/create-order` — creates a Razorpay order server-side (tamper-proof amount)
+2. Razorpay Checkout — user pays in their browser
+3. `/api/purchase/verify` — verifies HMAC-SHA256 signature (cryptographic proof of payment)
+4. `/api/webhooks/razorpay` — backup confirmation via `payment.captured` webhook
+
+> If `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are not set, the purchase page falls back to **mock mode** (grants access immediately without payment — for testing only).
+
+**Switch to live mode:**
+1. In Razorpay Dashboard → switch to Live Mode → generate Live keys
+2. Replace `rzp_test_...` keys with `rzp_live_...` in Vercel env vars
+3. Update the webhook URL if your domain changed
+4. Re-deploy
+
+### Step 4 — Google OAuth (optional)
+
+1. [console.cloud.google.com](https://console.cloud.google.com) → APIs & Services → Credentials → Create OAuth 2.0 Client ID
+2. Application type: **Web application**
+3. Authorised redirect URI: `https://your-site.vercel.app/api/auth/google/callback`
+4. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in Vercel
+
+### Step 5 — PDF assets
+
+Place your PDF files at these paths and commit them (they are **not** gitignored):
+
+```
+private/
+  book.pdf    # the full book — served only to authenticated, paying users
+  cover.pdf   # two-up landscape spread — public, used for the 3-D cover
+```
+
+`next.config.js` uses `outputFileTracingIncludes` to bundle these into the serverless functions on Vercel.
 
 ## PDF assets
 
